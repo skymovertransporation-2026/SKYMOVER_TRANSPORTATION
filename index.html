@@ -4728,15 +4728,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
             listEl.innerHTML = alerts.slice(0, 10).map(a => {
                 const ts = a.timestamp || a.time || a.created_at;
                 const timeStr = ts ? new Date(ts).toLocaleString() : 'Just now';
-                return `
-                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-1">
-                        <div class="flex justify-between items-center gap-2">
-                            <span class="text-xs font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${a.type || a.alert_type || 'Geofence Alert'}</span>
-                            <span class="text-[10px] font-mono text-slate-400">${timeStr}</span>
-                        </div>
-                        <p class="text-xs text-slate-200">${a.message || ''}</p>
-                    </div>
-                `;
+					return `
+					    <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-1">
+					        <div class="flex justify-between items-center gap-2">
+					            <span class="text-xs font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${escapeHtml(a.type || a.alert_type || 'Geofence Alert')}</span>
+					            <span class="text-[10px] font-mono text-slate-400">${escapeHtml(timeStr)}</span>
+					        </div>
+					        <p class="text-xs text-slate-200">${escapeHtml(a.message || '')}</p>
+					    </div>
+					`;
             }).join('');
         }
 
@@ -5762,7 +5762,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         helper_name,
                         helper_phone,
                         truck,
-                        attachments: stagedDriverAttachments.length > 0 ? [...stagedDriverAttachments] : (existing.attachments || [])
+                        attachments: [...(existing.attachments || []), ...stagedDriverAttachments]
                     };
                     db.drivers[currentEditingDriverIndex] = updatedRecord;
 						if (supabaseClient) {
@@ -7504,7 +7504,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             form.elements['category'].value = target.category || 'Other';
             form.elements['description'].value = target.description || '';
             form.elements['amount'].value = target.amount || 0;
-            form.elements['date'].value = target.date ? target.date.slice(0, 16) : new Date().toISOString().slice(0, 16);
+            form.elements['date'].value = formatIsoToLocalDateTimeInput(target.date || new Date().toISOString());
 
             const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
@@ -7871,8 +7871,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             form.elements['vanInAmount'].value = target.vanInAmount || 0;
             form.elements['vanInStats'].value = target.vanInStats || 'PAID';
             form.elements['tier'].value = target.tier || '1';
-            form.elements['date'].value = target.date ? target.date.slice(0, 16) : new Date().toISOString().slice(0, 16);
-            form.elements['etaDate'].value = target.etaDate ? target.etaDate.slice(0, 16) : (target.date ? target.date.slice(0, 16) : new Date().toISOString().slice(0, 16));
+            form.elements['date'].value = formatIsoToLocalDateTimeInput(target.date || new Date().toISOString());
+            form.elements['etaDate'].value = formatIsoToLocalDateTimeInput(target.etaDate || target.date || new Date().toISOString());
             if (form.elements['gateInToD']) form.elements['gateInToD'].value = target.gateInToD || 'MORNING';
             form.elements['remarks'].value = target.remarks || '';
 
@@ -7898,7 +7898,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if (!modal || !content) return;
             modal.classList.remove('hidden');
 
-            const formattedDate = target.date ? target.date.slice(0, 16) : new Date().toISOString().slice(0, 16);
+            const formattedDate = formatIsoToLocalDateTimeInput(target.date || new Date().toISOString());
 
             content.innerHTML = `
                 <h3 class="text-xl font-bold text-white mb-4"><i class="fa-solid fa-pen-to-square text-emerald-400 mr-2"></i> Edit Yard Revenue Transaction</h3>
@@ -8519,7 +8519,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         id: normalizedUnitId,
                         model: val2,
                         status: val3 || 'Active',
-                        attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || [])
+                        attachments: [...(existing.attachments || []), ...stagedBackendAttachments]
                     };
                     db.vehicles[currentEditingRecordIndex] = updatedVehicle;
 
@@ -8555,7 +8555,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         liters: val2,
                         cost: val3,
                         station: stationVal,
-                        attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || [])
+                        attachments: [...(existing.attachments || []), ...stagedBackendAttachments]
                     };
                     db.fuelLogs[currentEditingRecordIndex] = updatedFuel;
 
@@ -8593,7 +8593,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if(!db.maintenanceLogs) db.maintenanceLogs = [];
                 if (currentEditingRecordIndex !== null && db.maintenanceLogs[currentEditingRecordIndex]) {
                     const existing = db.maintenanceLogs[currentEditingRecordIndex];
-                    const updatedMaint = { ...existing, unit: val1.toUpperCase(), issue: val2, cost: val3 || '₱0', attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
+                    const updatedMaint = { ...existing, unit: val1.toUpperCase(), issue: val2, cost: val3 || '₱0', attachments: [...(existing.attachments || []), ...stagedBackendAttachments] };
                     db.maintenanceLogs[currentEditingRecordIndex] = updatedMaint;
                     if (existing.id) await updateMaintenanceLogInSupabase(existing.id, updatedMaint);
                 } else {
@@ -8609,7 +8609,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 let dispatchedSmsAlert = null;
                 if (currentEditingRecordIndex !== null && db.dispatchLogs[currentEditingRecordIndex]) {
                     const existing = db.dispatchLogs[currentEditingRecordIndex];
-                    const updatedDispatch = { ...existing, unit: val1.toUpperCase(), route: val2, driver: val3, originHub: hubMeta.originHub || existing.originHub || null, destinationHub: hubMeta.destinationHub || existing.destinationHub || null, nearestHub: hubMeta.nearestHub || existing.nearestHub || null, lat: hubMeta.lat !== null ? hubMeta.lat : (existing.lat || null), lng: hubMeta.lng !== null ? hubMeta.lng : (existing.lng || null), attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
+                    const updatedDispatch = { ...existing, unit: val1.toUpperCase(), route: val2, driver: val3, originHub: hubMeta.originHub || existing.originHub || null, destinationHub: hubMeta.destinationHub || existing.destinationHub || null, nearestHub: hubMeta.nearestHub || existing.nearestHub || null, lat: hubMeta.lat !== null ? hubMeta.lat : (existing.lat || null), lng: hubMeta.lng !== null ? hubMeta.lng : (existing.lng || null), attachments: [...(existing.attachments || []), ...stagedBackendAttachments] };
                     db.dispatchLogs[currentEditingRecordIndex] = updatedDispatch;
 						if (supabaseClient && existing.id) {
 	                        try {
@@ -8643,7 +8643,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const maintVal = document.getElementById('beInputMaint') ? document.getElementById('beInputMaint').value : '₱0.00';
                 if (currentEditingRecordIndex !== null && db.expenseLogs[currentEditingRecordIndex]) {
                     const existing = db.expenseLogs[currentEditingRecordIndex];
-                    const updatedRecord = { ...existing, trip: val1.toUpperCase(), fuel: val2 || '₱0.00', tolls: tollsVal || '₱0.00', maintenance: maintVal || '₱0.00', total: val3, attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
+                    const updatedRecord = { ...existing, trip: val1.toUpperCase(), fuel: val2 || '₱0.00', tolls: tollsVal || '₱0.00', maintenance: maintVal || '₱0.00', total: val3, attachments: [...(existing.attachments || []), ...stagedBackendAttachments] };
                     db.expenseLogs[currentEditingRecordIndex] = updatedRecord;
                     if (existing.id) await updateFleetExpenseInSupabase(existing.id, updatedRecord);
                 } else {
@@ -9215,7 +9215,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     remarks: formData.get('remarks'),
                     vanInAmount: parseFloat(formData.get('vanInAmount')) || 0,
                     vanInStats: formData.get('vanInStats'),
-                    photos: stagedGateInPhotos.length > 0 ? stagedGateInPhotos : (existing.photos || [])
+                    photos: [...(existing.photos || []), ...stagedGateInPhotos]
                 };
 
                 yardDb.containers[currentEditingYardContainerIndex] = updatedContainer;
@@ -9331,7 +9331,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if(gateInDisplay) gateInDisplay.value = match.date || '';
 
                 const gateOutDateInput = document.getElementById('calcGateOutDate');
-                if (gateOutDateInput && match.date) gateOutDateInput.value = new Date().toISOString().slice(0,16);
+                if (gateOutDateInput && match.date) gateOutDateInput.value = formatIsoToLocalDateTimeInput(new Date().toISOString());
                 recalculateTotals();
             } else {
                 if(plateInput) plateInput.value = '';
@@ -9411,7 +9411,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 }
 
                 try {
-                    const nowLocalIso = new Date().toISOString().slice(0, 16);
+                    const nowLocalIso = formatIsoToLocalDateTimeInput(new Date().toISOString());
 
                     // 1. Update matching active container in yard_containers if present (mark Reserved for Yard Review)
                     const existingContainer = (yardDb.containers || []).find(c =>
@@ -9596,19 +9596,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
             let totalRev = 0;
             tbody.innerHTML = revs.length ? revs.map(r => {
                 totalRev += Number(r.amount || 0);
-                return `
-                    <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono text-[11px]">${r.date ? new Date(r.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-semibold">${r.source}</td>
-                        <td class="p-3 font-mono font-bold">${r.container}</td>
-                        <td class="p-3 font-mono">${r.eir}</td>
-                        <td class="p-3 text-right font-extrabold text-emerald-700">₱${Number(r.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                        <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="editYardRevenueEntry(${r.originalIdx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteYardRevenueEntry(${r.originalIdx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
-                        </td>
-                    </tr>
-                `;
+					return `
+					    <tr class="border-b hover:bg-slate-50">
+					        <td class="p-3 font-mono text-[11px]">${r.date ? new Date(r.date).toLocaleString() : '—'}</td>
+					        <td class="p-3 font-semibold">${escapeHtml(r.source)}</td>
+					        <td class="p-3 font-mono font-bold">${escapeHtml(r.container)}</td>
+					        <td class="p-3 font-mono">${escapeHtml(r.eir)}</td>
+					        <td class="p-3 text-right font-extrabold text-emerald-700">₱${Number(r.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+					        <td class="p-3 text-right space-x-1">
+					            ${isAdmin ? `<button onclick="editYardRevenueEntry(${r.originalIdx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
+					            <button onclick="deleteYardRevenueEntry(${r.originalIdx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
+					        </td>
+					    </tr>
+					`;
             }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500">No revenue records found for selected filter.</td></tr>';
 
             if(document.getElementById('totalRevenueDisplay')) document.getElementById('totalRevenueDisplay').innerText = '₱' + totalRev.toLocaleString('en-US', {minimumFractionDigits: 2});
@@ -9802,18 +9802,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             tbody.innerHTML = expenses.length ? expenses.map((ex, idx) => {
                 totalExp += Number(ex.amount || 0);
-                return `
-                    <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono text-[11px]">${ex.date ? new Date(ex.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-bold text-slate-800">${ex.category}</td>
-                        <td class="p-3">${ex.description}</td>
-                        <td class="p-3 text-right font-extrabold text-rose-700">₱${Number(ex.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                        <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="editYardExpenseEntry(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteYardExpenseEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
-                        </td>
-                    </tr>
-                `;
+					return `
+					    <tr class="border-b hover:bg-slate-50">
+					        <td class="p-3 font-mono text-[11px]">${ex.date ? new Date(ex.date).toLocaleString() : '—'}</td>
+					        <td class="p-3 font-bold text-slate-800">${escapeHtml(ex.category)}</td>
+					        <td class="p-3">${escapeHtml(ex.description)}</td>
+					        <td class="p-3 text-right font-extrabold text-rose-700">₱${Number(ex.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+					        <td class="p-3 text-right space-x-1">
+					            ${isAdmin ? `<button onclick="editYardExpenseEntry(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
+					            <button onclick="deleteYardExpenseEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
+					        </td>
+					    </tr>
+					`;
             }).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No expense records logged.</td></tr>';
 
             if(document.getElementById('totalExpenseDisplay')) document.getElementById('totalExpenseDisplay').innerText = '₱' + totalExp.toLocaleString('en-US', {minimumFractionDigits: 2});
@@ -9942,15 +9942,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if(!tbody) return;
             const items = db.transshipments || [];
             const canApprove = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
-            tbody.innerHTML = items.length ? items.map((t, idx) => `
+			tbody.innerHTML = items.length ? items.map((t, idx) => `
                 <tr class="border-b border-slate-800">
-                    <td class="p-3 font-mono font-bold text-sky-400">${t.id}</td>
-                    <td class="p-3">${t.origin}</td>
-                    <td class="p-3 font-mono">${t.container}</td>
+                    <td class="p-3 font-mono font-bold text-sky-400">${escapeHtml(t.id)}</td>
+                    <td class="p-3">${escapeHtml(t.origin)}</td>
+                    <td class="p-3 font-mono">${escapeHtml(t.container)}</td>
                     <td class="p-3 font-bold text-emerald-400">₱${Number(t.commission || 0).toLocaleString()}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.status.includes('Accepted') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">${t.status}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${(t.status || '').includes('Accepted') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">${escapeHtml(t.status || 'Pending')}</span></td>
                     <td class="p-3 text-right">
-                        ${canApprove ? `<button onclick="acceptTransshipmentOrder(${idx})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[10px] font-bold mr-1">Accept</button>
+                        ${canApprove ? `
+                        <button onclick="acceptTransshipmentOrder(${idx})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[10px] font-bold mr-1">Accept</button>
                         <button onclick="rejectTransshipmentOrder(${idx})" class="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded text-[10px] font-bold">Reject</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                     </td>
                 </tr>
