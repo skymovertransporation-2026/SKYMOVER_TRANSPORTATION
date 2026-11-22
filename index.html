@@ -177,8 +177,11 @@
                     </div>
                     <h3 class="text-lg font-bold text-white mb-1" data-i18n="card3Title">Safe Keeping</h3>
                     <p class="text-xs text-slate-300 mb-4" data-i18n="card3Desc">Waybill, Photograph, Commission & Terminal Acceptance</p>
-                    <span class="text-emerald-400 text-xs font-semibold inline-flex items-center gap-1 group-hover:translate-x-1 transition" data-i18n="card3Link">Open Empty Yard →</span>
-                </div>
+					<div class="flex items-center justify-between gap-2">
+					    <span class="text-emerald-400 text-xs font-semibold inline-flex items-center gap-1 group-hover:translate-x-1 transition" data-i18n="card3Link">Open Empty Yard →</span>
+					    <button onclick="event.stopPropagation(); openHubPortal();" class="text-sky-400 text-xs font-semibold hover:underline">Transshipment Hub →</button>
+					</div>					
+				</div>
             </div>
         </section>
 
@@ -592,7 +595,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <div><label class="font-bold text-slate-800 mb-1 block">Container Number *</label><input name="number" required class="p-2 border rounded-lg w-full bg-white font-mono text-slate-900" placeholder="ABCD1234567"></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Container Size *</label><select name="size" required class="p-2 border rounded-lg w-full bg-white text-slate-900"><option value="">Select size</option><option>20FT</option><option>40FT</option><option>40HC</option><option>45FT</option></select></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Container Type</label><select name="type" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>Dry</option><option>Reefer</option><option>Open Top</option><option>Flat Rack</option><option>Other</option></select></div>
-                            <div><label class="font-bold text-slate-800 mb-1 block">Shipping Line *</label><select name="line" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>TS LINE</option><option>EVERGREEN</option><option>SINO TRANS</option><option>ASL</option><option>COSCO</option><option>ONE</option><option>M-SC</option><option>HMM</option><option>MAERKS</option><option>CMA-CGM</option><option>WAN-HAI</option><option>OOCL</option><option>ZIM LINE</option><option>PIL</option><option>SITC</option></select></div>
+                            <div><label class="font-bold text-slate-800 mb-1 block">Shipping Line *</label><select name="line" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>TS LINE</option><option>EVERGREEN</option><option>SINO TRANS</option><option>ASL</option><option>COSCO</option><option>ONE</option><option>M-SC</option><option>HMM</option><option>MAERSK</option><option>CMA-CGM</option><option>WAN-HAI</option><option>OOCL</option><option>ZIM LINE</option><option>PIL</option><option>SITC</option></select></div>
                             <div>
                                 <label class="font-bold text-slate-800 mb-1 block">Trucking Name *</label>
                                 <input type="text" name="truckingName" id="gateInTruckingName" list="truckingNameOptions" required class="p-2 border rounded-lg w-full bg-white text-slate-900" placeholder="Type or select Trucking Name">
@@ -1020,13 +1023,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
             <form onsubmit="event.preventDefault(); handleSupabaseSignIn(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value, true);" class="modal-form">
                 <div class="form-group">
                     <label for="loginEmail">Email Address</label>
-                    <input type="email" id="loginEmail" required value="admin@skymover.com" placeholder="admin@skymover.com">
+                    <input type="email" id="loginEmail" required placeholder="admin@skymover.com">
                 </div>
                 <div class="form-group">
                     <div class="password-label-wrapper">
                         <label for="loginPassword">Password</label>
                     </div>
-                    <input type="password" id="loginPassword" required value="Skymover_Transportation_2026" placeholder="••••••••">
+                    <input type="password" id="loginPassword" required placeholder="••••••••">
                 </div>
                 <button type="submit" id="signInSubmitBtn" class="skymover-btn-primary">Sign In to Dashboard</button>
             </form>
@@ -1224,6 +1227,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
     <!-- JAVASCRIPT LOGIC WITH SUPABASE AUTHENTICATION, REAL-TIME WEBSOCKET SYNC, RBAC & CLIENT QR ACCESS -->
     <script>
+		function escapeHtml(str) {return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');}
         let stagedGateInPhotos = [];
         let stagedGateOutPhotos = [];
         let stagedDriverAttachments = [];
@@ -2701,7 +2705,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                     currentUser = session.user;
                     currentUserEmail = currentUser.email || '';
-                    currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'admin';
+					currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
 
                     const loginModal = document.getElementById('loginModal');
                     if (loginModal) loginModal.style.display = 'none';
@@ -2731,7 +2735,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     if (session && session.user) {
                         currentUser = session.user;
                         currentUserEmail = currentUser.email || '';
-                        currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'admin';
+						currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
                         updateAuthUI(currentUser, currentUserRole);
                         resetInactivityTimer();
                     }
@@ -2899,7 +2903,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 } else if(data && data.user) {
                     currentUser = data.user;
                     currentUserEmail = currentUser.email || '';
-                    currentUserRole = currentUser.user_metadata && currentUser.user_metadata.role ? currentUser.user_metadata.role : 'admin';
+                    currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
 
                     localStorage.removeItem('skymover_active_view');
                     localStorage.removeItem('skymover_active_yard_tab');
@@ -3008,7 +3012,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if(!supabaseClient) return;
             try {
                 await loadYardSettingsFromSupabase();
-
+				if (isClientQrMode) return;
+				
                 const { data, error } = await supabaseClient.from('skymover_enterprise_db').select('*').eq('id', 1).single();
                 if(!error && data && data.payload) {
                     const cloudBackend = data.payload.managementBackend || {};
@@ -3044,6 +3049,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 }
 
                 await fetchHubLocationsFromSupabase();
+				await fetchVehiclesFromSupabase();
+				await fetchDriversFromSupabase();
+				await fetchFuelLogsFromSupabase();
                 await fetchLogiTrackDataFromSupabase();
                 await fetchDispatchLogsFromSupabase();
                 await fetchFleetExpensesFromSupabase();
@@ -3347,7 +3355,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 refreshYard();
                 refreshHubDatalist();
 
-                if(supabaseClient) {
+                if(supabaseClient && !isClientQrMode) {
                     const { error } = await supabaseClient.from('skymover_enterprise_db').upsert({
                         id: 1,
                         payload: { managementBackend: db, emptyYard: yardDb },
@@ -3365,13 +3373,26 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
+		async function verifyAdminPassword(pwd) {
+		    if (!pwd || !supabaseClient || !currentUserEmail) return false;
+		    const { error } = await supabaseClient.auth.signInWithPassword({
+		        email: currentUserEmail,
+		        password: pwd
+		    });
+		    if (error) {
+		        alert('⛔ Incorrect Administrator password.');
+		        return false;
+		    }
+		    return true;
+		}
+		
         // ==========================================
         // 1. RESET DB: MANAGEMENT BACKEND & DRIVER'S SIDE ONLY
         // ==========================================
         async function confirmResetBackendAndDriverDB() {
             if (!requireAdminExecution("reset Management Backend & Driver's Side records")) return;
             const pwd = prompt('🔒 Enter Administrator Password to Reset Management Backend & Driver\'s Side Records (Empty Yard records will be preserved):');
-            if (pwd !== 'Skymover_Transportation_2026') return;
+            if (!(await verifyAdminPassword(pwd))) return;
 
             try {
                 const backupPayload = {
@@ -3533,7 +3554,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         async function confirmResetEmptyYardDB() {
             if (!requireAdminExecution("reset Empty Yard records")) return;
             const pwd = prompt('🔒 Enter Administrator Password to Reset Empty Yard Records (Management Backend & Driver\'s Side records will be preserved):');
-            if (pwd !== 'Skymover_Transportation_2026') return;
+            if (!(await verifyAdminPassword(pwd))) return;
 
             try {
                 const backupPayload = {
@@ -4647,6 +4668,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
+			let pendingUploadsCount = 0;
+		
         async function processFiles(files, type) {
             let containerId = 'gateInPhotoPreviewContainer';
             if(type === 'gateOut') containerId = 'gateOutPhotoPreviewContainer';
@@ -4658,6 +4681,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if(!previewContainer) return;
 
             for (let file of files) {
+					if (file.size > 10 * 1024 * 1024) {
+					    alert(`⚠️ "${file.name}" exceeds the 10 MB file size limit and was skipped.`);
+					    continue;
+					}		
                 const optimizedFile = await compressImageFile(file);
 
                 const reader = new FileReader();
@@ -4697,9 +4724,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     }
                     previewContainer.appendChild(thumb);
 
-                    uploadCompressedPhotosToSupabaseStorage(tempFileObj, folder).then(storageUrl => {
-                        if (storageUrl) fileObj.dataUrl = storageUrl;
-                    });
+					pendingUploadsCount++;
+                    uploadCompressedPhotosToSupabaseStorage(tempFileObj, folder)
+                        .then(storageUrl => {
+                            if (storageUrl) fileObj.dataUrl = storageUrl;
+                        })
+                        .finally(() => {
+                            pendingUploadsCount = Math.max(0, pendingUploadsCount - 1);
+                        });
                 };
                 reader.readAsDataURL(optimizedFile);
             }
@@ -5508,6 +5540,27 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         attachments: stagedDriverAttachments.length > 0 ? [...stagedDriverAttachments] : (existing.attachments || [])
                     };
                     db.drivers[currentEditingDriverIndex] = updatedRecord;
+						if (supabaseClient) {
+	                        try {
+	                            const driverPayload = {
+	                                driver_name: updatedRecord.driver_name,
+	                                driver_license: updatedRecord.driver_license_number,
+	                                driver_phone: updatedRecord.driver_phone,
+	                                helper_name: updatedRecord.helper_name,
+	                                helper_phone: updatedRecord.helper_phone,
+	                                assigned_unit: updatedRecord.truck || 'Unassigned',
+	                                status: updatedRecord.status || 'Available',
+	                                attachments: updatedRecord.attachments || []
+	                            };
+	                            if (existing.id) {
+	                                await supabaseClient.from('drivers').update(driverPayload).eq('id', existing.id);
+	                            } else {
+	                                await supabaseClient.from('drivers').update(driverPayload).eq('driver_license', existing.driver_license_number || existing.driver_license);
+	                            }
+	                        } catch (err) {
+	                            console.warn('Driver Supabase update notice:', err.message || err);
+	                        }
+	                    }
                 } else {
                     const newDriverRecord = {
                         driver_name,
@@ -8058,6 +8111,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     <div><label class="block text-slate-300 mb-1 font-semibold">Unit ID *</label><input type="text" id="beInput1" required value="${existing ? existing.unit : ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
                     <div><label class="block text-slate-300 mb-1 font-semibold">Volume (Liters) *</label><input type="text" id="beInput2" required value="${existing ? existing.liters : ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
                     <div><label class="block text-slate-300 mb-1 font-semibold">Total Cost (₱) *</label><input type="text" id="beInput3" required value="${existing ? existing.cost : ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
+					<div><label class="block text-slate-300 mb-1 font-semibold">Fuel Station</label><input type="text" id="beInputStation" value="${existing ? (existing.station || '') : 'Shell Station'}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
                 `;
             } else if (type === 'Maintenance') {
                 const existing = (editIndex !== null && db.maintenanceLogs && db.maintenanceLogs[editIndex]) ? db.maintenanceLogs[editIndex] : null;
@@ -8224,9 +8278,30 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } else if (currentBackendModuleType === 'Vehicle') {
                 if(!db.vehicles) db.vehicles = [];
                 const normalizedUnitId = val1.toUpperCase();
-                if (currentEditingRecordIndex !== null && db.vehicles[currentEditingRecordIndex]) {
+					if (currentEditingRecordIndex !== null && db.vehicles[currentEditingRecordIndex]) {
                     const existing = db.vehicles[currentEditingRecordIndex];
-                    db.vehicles[currentEditingRecordIndex] = { ...existing, id: normalizedUnitId, model: val2, status: val3 || 'Active', attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
+                    const updatedVehicle = {
+                        ...existing,
+                        id: normalizedUnitId,
+                        model: val2,
+                        status: val3 || 'Active',
+                        attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || [])
+                    };
+                    db.vehicles[currentEditingRecordIndex] = updatedVehicle;
+
+                    if (supabaseClient && existing.id) {
+                        try {
+                            await supabaseClient.from('vehicles').update({
+                                id: updatedVehicle.id,
+                                model: updatedVehicle.model,
+                                status: updatedVehicle.status,
+                                driver: updatedVehicle.driver || 'Unassigned',
+                                attachments: updatedVehicle.attachments
+                            }).eq('id', existing.id);
+                        } catch (err) {
+                            console.warn('Vehicle Supabase update notice:', err.message || err);
+                        }
+                    }
                 } else {
                     const vehObj = { id: normalizedUnitId, model: val2, status: val3 || 'Active', driver: 'Unassigned', attachments: stagedBackendAttachments };
                     db.vehicles.push(vehObj);
@@ -8234,13 +8309,49 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 }
                 currentEditingRecordIndex = null;
                 await saveCloudData(); closeBackendEntryModal(); openSubModule('Vehicle Management');
-            } else if (currentBackendModuleType === 'Fuel') {
+			} else if (currentBackendModuleType === 'Fuel') {
                 if(!db.fuelLogs) db.fuelLogs = [];
+                const stationVal = document.getElementById('beInputStation')?.value.trim() || 'Shell Station';
+
                 if (currentEditingRecordIndex !== null && db.fuelLogs[currentEditingRecordIndex]) {
                     const existing = db.fuelLogs[currentEditingRecordIndex];
-                    db.fuelLogs[currentEditingRecordIndex] = { ...existing, unit: val1.toUpperCase(), liters: val2, cost: val3, attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
+                    const updatedFuel = {
+                        ...existing,
+                        unit: val1.toUpperCase(),
+                        liters: val2,
+                        cost: val3,
+                        station: stationVal,
+                        attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || [])
+                    };
+                    db.fuelLogs[currentEditingRecordIndex] = updatedFuel;
+
+                    if (supabaseClient && existing.id) {
+                        try {
+                            const receiptUrl = (updatedFuel.attachments && updatedFuel.attachments[0])
+                                ? (updatedFuel.attachments[0].dataUrl || null)
+                                : null;
+
+                            await supabaseClient.from('fuel_logs').update({
+                                unit_id: updatedFuel.unit,
+                                liters: parseFloat(updatedFuel.liters) || 0,
+                                cost: parsePesoNumber(updatedFuel.cost),
+                                station: updatedFuel.station,
+                                receipt_url: receiptUrl
+                            }).eq('id', existing.id);
+                        } catch (err) {
+                            console.warn('Fuel Log Supabase update notice:', err.message || err);
+                        }
+                    }
                 } else {
-                    db.fuelLogs.push({ unit: val1.toUpperCase(), liters: val2, cost: val3, station: 'Shell Station', date: new Date().toISOString().substring(0, 10), attachments: stagedBackendAttachments });
+                    const fuelRec = {
+                        unit: val1.toUpperCase(),
+                        liters: val2,
+                        cost: val3,
+                        station: stationVal,
+                        date: new Date().toISOString().substring(0, 10),
+                        attachments: stagedBackendAttachments
+                    };
+                    await insertFuelLogToSupabase(fuelRec, stagedBackendAttachments[0] || null);
                 }
                 currentEditingRecordIndex = null;
                 await saveCloudData(); closeBackendEntryModal(); openSubModule('Fuel Monitoring');
@@ -8266,6 +8377,23 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     const existing = db.dispatchLogs[currentEditingRecordIndex];
                     const updatedDispatch = { ...existing, unit: val1.toUpperCase(), route: val2, driver: val3, originHub: hubMeta.originHub || existing.originHub || null, destinationHub: hubMeta.destinationHub || existing.destinationHub || null, nearestHub: hubMeta.nearestHub || existing.nearestHub || null, lat: hubMeta.lat !== null ? hubMeta.lat : (existing.lat || null), lng: hubMeta.lng !== null ? hubMeta.lng : (existing.lng || null), attachments: stagedBackendAttachments.length > 0 ? stagedBackendAttachments : (existing.attachments || []) };
                     db.dispatchLogs[currentEditingRecordIndex] = updatedDispatch;
+						if (supabaseClient && existing.id) {
+	                        try {
+	                            await supabaseClient.from('dispatch_logs').update({
+	                                unit_id: updatedDispatch.unit,
+	                                route: updatedDispatch.route,
+	                                driver_name: updatedDispatch.driver,
+	                                status: updatedDispatch.status || 'In Transit',
+	                                latitude: updatedDispatch.lat || null,
+	                                longitude: updatedDispatch.lng || null,
+	                                nearest_hub: updatedDispatch.nearestHub || null,
+	                                attachments: updatedDispatch.attachments || [],
+	                                updated_at: new Date().toISOString()
+	                            }).eq('id', existing.id);
+	                        } catch (err) {
+	                            console.warn('Dispatch Supabase update notice:', err.message || err);
+	                        }
+	                    }
                 } else {
                     const dispatchRec = { unit: val1.toUpperCase(), route: val2, driver: val3, status: 'In Transit', originHub: hubMeta.originHub, destinationHub: hubMeta.destinationHub, nearestHub: hubMeta.nearestHub, lat: hubMeta.lat, lng: hubMeta.lng, attachments: stagedBackendAttachments };
                     db.dispatchLogs.unshift(dispatchRec);
@@ -8309,7 +8437,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
         function setExtractionReportFilter(filterMode) { currentExtractionFilter = filterMode; openExtractionReport(); }
 
-        function buildVisualExtractionSectionsHtml(filterMode) {
+		function buildVisualExtractionSectionsHtml(filterMode) {
             const allContainers = (yardDb.containers || []);
             const gateInContainers = allContainers;
             const gateOutMovements = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
@@ -8321,27 +8449,27 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             const gateInHtml = gateInContainers.length ? gateInContainers.map(c => `
                 <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
-                    <td class="p-2 font-mono font-bold text-sky-800">${c.number}</td>
-                    <td class="p-2">${c.size} / ${c.type || 'Dry'}<br><span class="text-[10px] text-slate-600">${c.line}</span></td>
-                    <td class="p-2">${c.truckingName || '—'}<br><span class="font-mono text-[10px]">${c.plate || '—'} • ${c.driver || 'No Driver'}</span></td>
-                    <td class="p-2 font-mono text-[10px]">EIR: ${c.eir || '—'}<br>${c.block || 'A'}/${c.bay || '1'}/${c.row || 'GROUND'}/T${c.tier || '1'}</td>
-                    <td class="p-2">${c.condition || 'Good'}<br><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900">${c.status}</span></td>
-                    <td class="p-2 font-mono text-[10px]">In: ${c.date ? new Date(c.date).toLocaleString() : '—'} (${c.gateInToD || '—'})<br>ETA: ${c.etaDate ? new Date(c.etaDate).toLocaleString() : '—'}</td>
-                    <td class="p-2 font-mono text-[10px]">₱${Number(c.vanInAmount || 0).toLocaleString()}<br><span class="font-bold">${c.vanInStats || 'PAID'}</span></td>
-                    <td class="p-2 text-[10px]">${c.remarks || '—'}</td>
+                    <td class="p-2 font-mono font-bold text-sky-800">${escapeHtml(c.number)}</td>
+                    <td class="p-2">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}<br><span class="text-[10px] text-slate-600">${escapeHtml(c.line)}</span></td>
+                    <td class="p-2">${escapeHtml(c.truckingName || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(c.plate || '—')} • ${escapeHtml(c.driver || 'No Driver')}</span></td>
+                    <td class="p-2 font-mono text-[10px]">EIR: ${escapeHtml(c.eir || '—')}<br>${escapeHtml(c.block || 'A')}/${escapeHtml(c.bay || '1')}/${escapeHtml(c.row || 'GROUND')}/T${escapeHtml(c.tier || '1')}</td>
+                    <td class="p-2">${escapeHtml(c.condition || 'Good')}<br><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900">${escapeHtml(c.status)}</span></td>
+                    <td class="p-2 font-mono text-[10px]">In: ${c.date ? new Date(c.date).toLocaleString() : '—'} (${escapeHtml(c.gateInToD || '—')})<br>ETA: ${c.etaDate ? new Date(c.etaDate).toLocaleString() : '—'}</td>
+                    <td class="p-2 font-mono text-[10px]">₱${Number(c.vanInAmount || 0).toLocaleString()}<br><span class="font-bold">${escapeHtml(c.vanInStats || 'PAID')}</span></td>
+                    <td class="p-2 text-[10px]">${escapeHtml(c.remarks || '—')}</td>
                     <td class="p-2">${renderPhotoThumbnailsForReport(c.photos, 'No inspection photos')}</td>
                 </tr>
             `).join('') : '<tr><td colspan="9" class="p-4 text-center text-slate-500">No Gate-In records found.</td></tr>';
 
             const gateOutHtml = gateOutMovements.length ? gateOutMovements.map(m => `
                 <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
-                    <td class="p-2 font-mono font-bold text-purple-800">${m.container}</td>
-                    <td class="p-2">${m.customer || '—'}<br><span class="font-mono text-[10px]">${m.plate || '—'} • ${m.driver || '—'}</span></td>
-                    <td class="p-2 font-mono text-[10px]">EIR: ${m.eir || '—'}<br>${m.storageFeeType || 'Dry Van'} @ ₱${m.storageRate || 450}/d</td>
-                    <td class="p-2">${m.storageDays || 0} Days<br><span class="font-mono text-[10px]">In: ₱${m.vanInAmount || 0} | Out: ₱${m.vanOutAmount || 0}</span></td>
+                    <td class="p-2 font-mono font-bold text-purple-800">${escapeHtml(m.container)}</td>
+                    <td class="p-2">${escapeHtml(m.customer || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(m.plate || '—')} • ${escapeHtml(m.driver || '—')}</span></td>
+                    <td class="p-2 font-mono text-[10px]">EIR: ${escapeHtml(m.eir || '—')}<br>${escapeHtml(m.storageFeeType || 'Dry Van')} @ ₱${Number(m.storageRate || 450)}/d</td>
+                    <td class="p-2">${Number(m.storageDays || 0)} Days<br><span class="font-mono text-[10px]">In: ₱${Number(m.vanInAmount || 0)} | Out: ₱${Number(m.vanOutAmount || 0)}</span></td>
                     <td class="p-2 font-bold text-emerald-700">₱${Number(m.totalAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    <td class="p-2 font-mono text-[10px]">Out: ${m.date ? new Date(m.date).toLocaleString() : '—'} (${m.gateOutToD || '—'})</td>
-                    <td class="p-2 text-[10px]">${m.remarks || '—'}</td>
+                    <td class="p-2 font-mono text-[10px]">Out: ${m.date ? new Date(m.date).toLocaleString() : '—'} (${escapeHtml(m.gateOutToD || '—')})</td>
+                    <td class="p-2 text-[10px]">${escapeHtml(m.remarks || '—')}</td>
                     <td class="p-2">${renderPhotoThumbnailsForReport(m.photos, 'No release photos')}</td>
                 </tr>
             `).join('') : '<tr><td colspan="8" class="p-4 text-center text-slate-500">No Gate-Out records found.</td></tr>';
@@ -8351,13 +8479,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const allPhotos = [...(c.photos || []), ...(c.releasePhotos || []), ...(matchingOut.photos || [])];
                 return `
                     <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
-                        <td class="p-2 font-mono font-bold text-emerald-800">${c.number}<br><span class="text-[10px] text-slate-600">${c.size} / ${c.line}</span></td>
-                        <td class="p-2"><strong>Customer:</strong> ${c.releaseCustomer || matchingOut.customer || '—'}<br><span class="font-mono text-[10px]">Trucking: ${c.truckingName || '—'} | Plate: ${c.plate || '—'}</span></td>
-                        <td class="p-2 font-mono text-[10px]">In EIR: ${c.eir || '—'}<br>Out EIR: ${matchingOut.eir || '—'}</td>
+                        <td class="p-2 font-mono font-bold text-emerald-800">${escapeHtml(c.number)}<br><span class="text-[10px] text-slate-600">${escapeHtml(c.size)} / ${escapeHtml(c.line)}</span></td>
+                        <td class="p-2"><strong>Customer:</strong> ${escapeHtml(c.releaseCustomer || matchingOut.customer || '—')}<br><span class="font-mono text-[10px]">Trucking: ${escapeHtml(c.truckingName || '—')} | Plate: ${escapeHtml(c.plate || '—')}</span></td>
+                        <td class="p-2 font-mono text-[10px]">In EIR: ${escapeHtml(c.eir || '—')}<br>Out EIR: ${escapeHtml(matchingOut.eir || '—')}</td>
                         <td class="p-2 font-mono text-[10px]">In: ${c.date ? new Date(c.date).toLocaleString() : '—'}<br>Out: ${c.gateOutDate ? new Date(c.gateOutDate).toLocaleString() : '—'}</td>
-                        <td class="p-2 font-mono text-[10px]">${c.storageDays || matchingOut.storageDays || 0} Days</td>
+                        <td class="p-2 font-mono text-[10px]">${Number(c.storageDays || matchingOut.storageDays || 0)} Days</td>
                         <td class="p-2 font-bold text-emerald-700">₱${Number(c.totalBilledAmount || matchingOut.totalAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                        <td class="p-2 text-[10px]">${c.remarks || '—'}</td>
+                        <td class="p-2 text-[10px]">${escapeHtml(c.remarks || '—')}</td>
                         <td class="p-2">${renderPhotoThumbnailsForReport(allPhotos, 'No photos')}</td>
                     </tr>
                 `;
@@ -8549,16 +8677,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             (yardDb.revenues || []).forEach(r => { totalRev += Number(r.amount || 0); });
             if(document.getElementById('dashTotalRev')) document.getElementById('dashTotalRev').innerText = '₱' + totalRev.toLocaleString('en-US', {minimumFractionDigits: 2});
 
-            const recentBody = document.getElementById('yardRecentBody');
+			const recentBody = document.getElementById('yardRecentBody');
             if(recentBody) {
                 const recent = (yardDb.movements || []).slice(0, 10);
                 recentBody.innerHTML = recent.length ? recent.map(m => `
                     <tr class="border-b">
                         <td class="p-3 font-mono text-[11px]">${m.date ? new Date(m.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${m.kind}</td>
-                        <td class="p-3 font-mono font-bold">${m.container}</td>
-                        <td class="p-3 font-mono">${m.plate || '—'}</td>
-                        <td class="p-3 font-mono">${m.eir || '—'}</td>
+                        <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
+                        <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
+                        <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
+                        <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
                         <td class="p-3 font-bold text-emerald-700">₱${Number(m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                     </tr>
                 `).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500">No recent movements logged.</td></tr>';
@@ -8629,9 +8757,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 return `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono font-bold text-slate-900">${c.number}</td>
-                        <td class="p-3">${c.size} / ${c.type || 'Dry'}</td>
-                        <td class="p-3 font-bold">${c.line}</td>
+						<td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(c.number)}</td>
+						<td class="p-3">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}</td>
+						<td class="p-3 font-bold">${escapeHtml(c.line)}</td>
                         <td class="p-3"><span class="pill ${badgeClass}">${c.status}</span></td>
                         <td class="p-3 font-mono text-xs">Block ${c.block || 'A'}, Bay ${c.bay || '1'} (${c.row || 'GROUND'})</td>
                         <td class="p-3 font-mono text-[11px]">${c.date ? new Date(c.date).toLocaleString() : '—'}</td>
@@ -8682,8 +8810,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         // GATE-IN HANDLER (FEATURE ENHANCEMENT #3: DIRECT SAVE TO SUPABASE FOR CLIENT & ADMIN)
         // ==========================================
-        async function handleYardGateIn(e) {
-            e.preventDefault();
+		async function handleYardGateIn(e) {
+			e.preventDefault();
+			if (pendingUploadsCount > 0) {
+                alert('⏳ Photos are still uploading to Cloud Storage. Please wait a second and click Submit again.');
+                return;
+            }
             if (!requireYardOperationExecution("record or update container Gate-In")) return;
 
             const form = document.getElementById('yardGateInForm');
@@ -8991,11 +9123,21 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const storageTotal = diffDays * storageRate;
             const vanOutAmount = parseFloat(document.getElementById('calcVanOutAmount').value) || 0;
 
-            const notice = document.getElementById('vanInDeductionNotice');
-            if(notice) notice.classList.add('hidden');
-
-            document.getElementById('calcStorageDays').value = diffDays;
-            document.getElementById('calcTotalAmount').value = (storageTotal + vanOutAmount).toFixed(2);
+			const notice = document.getElementById('vanInDeductionNotice');
+			const vanInAmount = parseFloat(match.vanInAmount) || 0;
+			const isVanInUnpaid = (match.vanInStats || '').toUpperCase() === 'UNPAID';
+			const unpaidVanInToAdd = isVanInUnpaid ? vanInAmount : 0;
+			
+			if (notice) {
+			    if (!isVanInUnpaid && vanInAmount > 0) {
+			        notice.classList.remove('hidden');
+			    } else {
+			        notice.classList.add('hidden');
+			    }
+			}
+			
+			document.getElementById('calcStorageDays').value = diffDays;
+			document.getElementById('calcTotalAmount').value = (storageTotal + vanOutAmount + unpaidVanInToAdd).toFixed(2);
         }
 
         // ==========================================
@@ -9003,6 +9145,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         async function handleYardGateOut(e) {
             e.preventDefault();
+			if (pendingUploadsCount > 0) {
+                alert('⏳ Photos are still uploading to Cloud Storage. Please wait a second and click Submit again.');
+                return;
+            }
+
             if (!requireYardOperationExecution("confirm container Gate-Out")) return;
 
             const form = document.getElementById('yardGateOutForm');
@@ -9458,10 +9605,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
             document.getElementById('yardRptLines').innerText = Object.keys(linesMap).length;
             document.getElementById('yardRptMoves').innerText = movesCount;
 
-            const lineRows = document.getElementById('yardLineRows');
+		const lineRows = document.getElementById('yardLineRows');
             if(lineRows) {
                 lineRows.innerHTML = Object.keys(linesMap).length ? Object.keys(linesMap).map(l => `
-                    <tr class="border-b"><td class="p-3 font-bold text-slate-900">${l}</td><td class="p-3 font-mono">${linesMap[l].total}</td><td class="p-3 font-mono text-emerald-700 font-bold">${linesMap[l].avail}</td><td class="p-3 font-mono text-amber-700 font-bold">${linesMap[l].res}</td><td class="p-3 font-mono text-rose-700 font-bold">${linesMap[l].dam}</td></tr>
+                    <tr class="border-b"><td class="p-3 font-bold text-slate-900">${escapeHtml(l)}</td><td class="p-3 font-mono">${linesMap[l].total}</td><td class="p-3 font-mono text-emerald-700 font-bold">${linesMap[l].avail}</td><td class="p-3 font-mono text-amber-700 font-bold">${linesMap[l].res}</td><td class="p-3 font-mono text-rose-700 font-bold">${linesMap[l].dam}</td></tr>
                 `).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No shipping line inventory data.</td></tr>';
             }
 
@@ -9471,13 +9618,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 movementRows.innerHTML = movements.length ? movements.map((m, idx) => `
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-3 font-mono text-[11px]">${m.date ? new Date(m.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${m.kind}</td>
-                        <td class="p-3 font-mono font-bold">${m.container}</td>
-                        <td class="p-3 font-mono">${m.plate || '—'}</td>
-                        <td class="p-3 font-mono">${m.storageDays || '—'}</td>
+                        <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
+                        <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
+                        <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
+                        <td class="p-3 font-mono">${escapeHtml(m.storageDays || '—')}</td>
                         <td class="p-3 font-mono">₱${Number(m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 font-extrabold text-emerald-700">₱${Number(m.totalAmount || m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                        <td class="p-3 font-mono">${m.eir || '—'}</td>
+                        <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
                         <td class="p-3 text-right">${isAdmin ? `<button onclick="deleteYardMovementEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}</td>
                     </tr>
                 `).join('') : '<tr><td colspan="9" class="p-4 text-center text-slate-500">No movement history logged.</td></tr>';
