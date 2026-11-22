@@ -485,6 +485,40 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 </div>
             </div>
 
+			<!-- CLIENT QR CONTAINER SEARCH & AUTO-COMPUTED STORAGE DAYS -->
+            <div id="clientQrContainerSearchPanel" class="hidden bg-slate-900/95 border border-sky-500/40 rounded-2xl p-5 shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+						<h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass text-sky-400"></i>
+                            Container Storage &amp; Status Lookup (Client QR)
+                        </h3>
+                        <p class="text-xs text-slate-300 mt-0.5">
+                            Enter your <strong>Container Number</strong> to view Gate-In details and auto-compute total storage days.
+                        </p>
+                    </div>
+                </div>
+
+                <form onsubmit="handleClientQrContainerSearch(event)" class="flex flex-col sm:flex-row gap-2.5">
+                    <input
+                        type="text"
+                        id="clientQrSearchInput"
+                        oninput="this.value = this.value.toUpperCase()"
+                        required
+                        class="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-4 py-2.5 text-sm font-mono font-bold text-white outline-none"
+                        placeholder="Enter Container No. (e.g. ABCD1234567)"
+                    >
+                    <button type="submit" id="clientQrSearchBtn" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow transition shrink-0">
+                        <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Search &amp; Compute Days
+                    </button>
+                    <button type="button" onclick="clearClientQrContainerSearch()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold transition shrink-0">
+                        Clear
+                    </button>
+                </form>
+
+                <div id="clientQrSearchResult" class="hidden"></div>
+            </div>
+			
             <div class="flex flex-wrap justify-between items-center gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
                 <div>
                     <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-warehouse text-amber-500 mr-2"></i> <span data-i18n="yardHeading">Skymover Empty Container Yard</span></h2>
@@ -1491,6 +1525,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const welcomeBanner = document.getElementById('clientQrWelcomeBanner');
             if (welcomeBanner) welcomeBanner.classList.remove('hidden');
 
+			const qrSearchPanel = document.getElementById('clientQrContainerSearchPanel');
+            if (qrSearchPanel) qrSearchPanel.classList.remove('hidden');
+
             const yardSub = document.getElementById('yardSubHeadingEl');
             if (yardSub) yardSub.textContent = 'Submit Gate-In & Gate-Out details directly to Database for immediate Yard Personnel review.';
 
@@ -1591,6 +1628,193 @@ Skymover Transport is not liable for charges incurred due to operational constra
             switchYardTab(initialClientTab);
         }
 
+		function computeTotalStorageDays(gateInDateStr, gateOutDateStr = null) {
+            if (!gateInDateStr) return null;
+            const startMs = new Date(gateInDateStr).getTime();
+            if (isNaN(startMs)) return null;
+
+            const endMs = gateOutDateStr ? new Date(gateOutDateStr).getTime() : Date.now();
+            if (isNaN(endMs)) return null;
+
+            const diffMs = Math.max(0, endMs - startMs);
+            return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        }
+
+		async function handleClientQrContainerSearch(e) {
+            if (e) e.preventDefault();
+            const inputEl = document.getElementById('clientQrSearchInput');
+            const resultEl = document.getElementById('clientQrSearchResult');
+            const searchBtn = document.getElementById('clientQrSearchBtn');
+            if (!inputEl || !resultEl) return;
+
+            const queryNo = inputEl.value.trim().toUpperCase();
+            if (!queryNo) return;
+
+            if (searchBtn) {
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Searching...';
+            }
+
+            try {
+                let record = null;
+
+                // Secure exact-match lookup via SECURITY DEFINER RPC
+                if (supabaseClient) {
+                    const { data, error } = await supabaseClient.rpc('client_qr_lookup_container', {
+                        p_container_number: queryNo
+                    });
+
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        const c = data[0];
+                        record = {
+                            number: c.container_number,
+                            size: c.size || '—',
+                            type: c.container_type || 'Dry',
+                            line: c.shipping_line || '—',
+                            condition: c.condition || 'Good',
+                            status: c.status || 'Pending',
+                            block: c.block || 'A',
+                            bay: c.bay || 'BAY-1',
+                            row: c.yard_row || 'GROUND',
+                            tier: c.tier || '1',
+                            storageDays: c.storage_days ?? null,
+                            date: formatIsoToLocalDateTimeInput(c.gate_in_date),
+                            gateOutDate: c.gate_out_date ? formatIsoToLocalDateTimeInput(c.gate_out_date) : null
+                        };
+                    }
+                }
+
+                // Local fallback only if offline / not yet synced
+                if (!record && Array.isArray(yardDb.containers)) {
+                    const localMatches = yardDb.containers.filter(
+                        c => (c.number || '').trim().toUpperCase() === queryNo
+                    );
+                    record = localMatches.find(m => m.status !== 'Released') || localMatches[0] || null;
+                }
+
+                resultEl.classList.remove('hidden');
+
+                if (!record) {
+                    resultEl.innerHTML = `
+                        <div class="bg-amber-950/40 border border-amber-500/40 rounded-xl p-4 text-xs text-amber-200">
+                            <i class="fa-solid fa-circle-info mr-1.5 text-amber-400"></i>
+                            No container record found for <strong class="font-mono">${escapeHtml(queryNo)}</strong>. Check the container number or submit a <strong>+ Gate-In</strong> entry below.
+                        </div>
+                    `;
+                    return;
+                }
+
+                const isReleased = record.status === 'Released';
+                const computedDays = isReleased && record.storageDays
+                    ? Number(record.storageDays)
+                    : computeTotalStorageDays(record.date, isReleased ? record.gateOutDate : null);
+
+                const daysLabel = computedDays !== null
+                    ? `${computedDays} ${computedDays === 1 ? 'Day' : 'Days'}`
+                    : 'Gate-In date unavailable';
+
+                const dayBasisNote = isReleased
+                    ? 'Final storage duration (Gate-In to Gate-Out)'
+                    : 'Auto-computed up to current time (Gate-In to Now)';
+
+                const gateInFormatted = record.date ? new Date(record.date).toLocaleString() : '—';
+                const gateOutFormatted = record.gateOutDate ? new Date(record.gateOutDate).toLocaleString() : 'Still in Yard';
+
+                resultEl.innerHTML = `
+                    <div class="bg-slate-950 border border-slate-700/90 rounded-xl p-4 space-y-4 text-xs">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                            <div>
+                                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Container Number</span>
+                                <div class="text-lg font-extrabold font-mono text-white">${escapeHtml(record.number)}</div>
+                            </div>
+                            <div class="bg-emerald-500/15 border border-emerald-400/40 rounded-xl px-4 py-2 text-right">
+                                <div class="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Total Storage</div>
+                                <div class="text-xl font-extrabold text-emerald-400 font-mono">${escapeHtml(daysLabel)}</div>
+                                <div class="text-[10px] text-emerald-200/80">${escapeHtml(dayBasisNote)}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-slate-200">
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                                <div class="text-[10px] text-slate-400 font-semibold">Status &amp; Condition</div>
+                                <div class="font-bold text-white mt-0.5">${escapeHtml(record.status || '—')} • ${escapeHtml(record.condition || '—')}</div>
+                            </div>
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                                <div class="text-[10px] text-slate-400 font-semibold">Size / Type / Line</div>
+                                <div class="font-bold text-white mt-0.5">${escapeHtml(record.size || '—')} / ${escapeHtml(record.type || 'Dry')} • ${escapeHtml(record.line || '—')}</div>
+                            </div>
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                                <div class="text-[10px] text-slate-400 font-semibold">Gate-In Date &amp; Time</div>
+                                <div class="font-mono text-[11px] text-sky-300 mt-0.5">${escapeHtml(gateInFormatted)}</div>
+                            </div>
+							<div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                                <div class="text-[10px] text-slate-400 font-semibold">Gate-Out / Slot</div>
+                                <div class="font-mono text-[11px] text-slate-200 mt-0.5">${escapeHtml(gateOutFormatted)}</div>
+                                <div class="font-mono text-[10px] text-slate-400 mt-0.5">Slot: ${escapeHtml(record.block || 'A')}/${escapeHtml(record.bay || 'BAY-1')}/${escapeHtml(record.row || 'GROUND')}/T${escapeHtml(record.tier || '1')}</div>
+                            </div>
+                        </div>
+
+                        ${!isReleased ? `
+                        <div class="flex justify-end pt-2 border-t border-slate-800">
+                            <button
+                                type="button"
+                                data-container="${escapeHtml(record.number)}"
+                                onclick="useSearchedContainerForGateOut(this.dataset.container)"
+                                class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition inline-flex items-center gap-1.5"
+                            >
+                                <i class="fa-solid fa-truck-arrow-right"></i> Use for Gate-Out
+                            </button>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+			} catch (err) {
+                console.warn('Client QR container search error:', err);
+                resultEl.classList.remove('hidden');
+                resultEl.innerHTML = `
+                    <div class="bg-rose-950/40 border border-rose-500/40 rounded-xl p-4 text-xs text-rose-200">
+                        <i class="fa-solid fa-triangle-exclamation mr-1.5 text-rose-400"></i>
+                        Unable to search right now. Please check your internet connection and try again.
+                    </div>
+                `;
+            } finally {
+                if (searchBtn) {
+                    searchBtn.disabled = false;
+                    searchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass mr-1.5"></i> Search &amp; Compute Days';
+                }
+            }
+        }
+
+        function clearClientQrContainerSearch() {
+            const inputEl = document.getElementById('clientQrSearchInput');
+            const resultEl = document.getElementById('clientQrSearchResult');
+            if (inputEl) inputEl.value = '';
+            if (resultEl) {
+                resultEl.innerHTML = '';
+                resultEl.classList.add('hidden');
+            }
+        }
+
+		function useSearchedContainerForGateOut(containerNo) {
+            if (!containerNo) return;
+            switchYardTab('yardGateOut');
+
+            const outInput = document.getElementById('yardOutContainerInput');
+            if (outInput) {
+                outInput.value = containerNo.trim().toUpperCase();
+            }
+
+            const gateOutSection = document.getElementById('yardGateOut');
+            if (gateOutSection) {
+                gateOutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            const customerInput = document.getElementById('gateOutCustomer');
+            if (customerInput) {
+                setTimeout(() => customerInput.focus(), 300);
+            }
+        }
+		
         function openClientQrModal() {
             if (!requireYardOperationExecution("generate or configure Client QR Access")) return;
             const modal = document.getElementById('clientQrModal');
@@ -1668,7 +1892,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
 		function parseMultipleEmails(rawStr) {
-            if (!rawStr || typeof rawStr !== 'string') return [];
+            if (!rawStr || typeof rawStr !== 'string') return { valid: [], invalid: [] };
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             const parts = rawStr
                 .split(/[,;\n]+/)
@@ -3009,12 +3233,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
             yardDb.expenses = deduplicateArrayByKey(yardDb.expenses, ex => ex.id ? `id:${ex.id}` : `exp:${(ex.category || '').trim()}_${(ex.description || '').trim()}_${(ex.date || '').trim()}_${Number(ex.amount || 0)}`);
         }
 
-        async function fetchCloudData() {
+		async function fetchCloudData() {
             if(!supabaseClient) return;
             try {
                 await loadYardSettingsFromSupabase();
-				if (isClientQrMode) return;
-				
+                if (isClientQrMode) return;
+
                 const { data, error } = await supabaseClient.from('skymover_enterprise_db').select('*').eq('id', 1).single();
                 if(!error && data && data.payload) {
                     const cloudBackend = data.payload.managementBackend || {};
@@ -7398,6 +7622,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 if (c.id) {
                     await supabaseClient.from('yard_containers').update(payload).eq('id', c.id);
+				} else if (isClientQrMode) {
+                    await supabaseClient.from('yard_containers').insert(payload);
                 } else {
                     const { data, error } = await supabaseClient.from('yard_containers').insert(payload).select().single();
                     if (!error && data && data.id) c.id = data.id;
@@ -7505,7 +7731,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (e) {}
         }
 
-        async function insertYardMovementToSupabase(m) {
+		async function insertYardMovementToSupabase(m) {
             if (!supabaseClient) return false;
             try {
                 const resolvedToD = m.kind === 'GATE-OUT' ? (m.gateOutToD || null) : (m.gateInToD || null);
@@ -7513,7 +7739,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     ? (parseFloat(m.vanInAmount) || 0)
                     : (m.kind === 'GATE-IN' ? (parseFloat(m.amount) || 0) : 0);
 
-                const { data, error } = await supabaseClient.from('yard_movements').insert({
+                const movementPayload = {
                     movement_kind: m.kind, container_number: m.container, size: m.size || null,
                     container_type: m.type || null, shipping_line: m.line || null, trucking_name: m.truckingName || null,
                     truck_plate: m.plate || null, driver_name: m.driver || null, customer: m.customer || null,
@@ -7530,7 +7756,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     eta_pullout_date: m.etaPulloutDate ? new Date(m.etaPulloutDate).toISOString() : null,
                     remarks: m.remarks || null, photos: Array.isArray(m.photos) ? m.photos : [],
                     logged_by: isClientQrMode ? 'client_qr' : (currentUser ? currentUser.email : 'system')
-                }).select().single();
+                };
+
+                if (isClientQrMode) {
+                    const { error } = await supabaseClient.from('yard_movements').insert(movementPayload);
+                    return !error;
+                }
+
+                const { data, error } = await supabaseClient.from('yard_movements').insert(movementPayload).select().single();
                 if (!error && data && data.id) m.id = data.id;
                 return !error;
             } catch (e) { return false; }
