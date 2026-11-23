@@ -3083,15 +3083,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function closeSkymoverLogin() {
-            if (!currentUser || currentUserRole === 'guest') {
-                alert('Authentication required. Please sign in to access SkyMover Transportation platforms.');
-                window.openSkymoverLogin();
-                return;
-            }
-	    const loginModal = document.getElementById('loginModal');
-            if(loginModal) loginModal.style.display = 'none';
-        }
+		function closeSkymoverLogin() {
+		    const submitBtn = document.getElementById('signInSubmitBtn');
+		    if(submitBtn && submitBtn.disabled) {
+		        return;
+		    }
+		    if (!currentUser || currentUserRole === 'guest') {
+		        window.openSkymoverLogin();
+		        return;
+		    }
+		    const loginModal = document.getElementById('loginModal');
+		    if(loginModal) loginModal.style.display = 'none';
+		}
 
         async function handleSupabaseSignOut(isAutoTimeout = false) {
             clearTimeout(inactivityTimer);
