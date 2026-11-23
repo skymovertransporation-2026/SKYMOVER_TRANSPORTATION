@@ -5318,42 +5318,61 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         (d.attachments || []).length
                     ])
                 ];
-            } else if (moduleName === 'Empty Container Inventory') {
+			} else if (moduleName === 'Empty Container Inventory') {
+                const gateOutMovements = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
                 csvRows = [
                     ['Container No.', 'Size', 'Type', 'Shipping Line', 'Trucking Name', 'Truck Plate No.', 'Driver Name', 'EIR / Reference No.', 'Condition', 'Status', 'Block', 'Bay', 'Row', 'Tier', 'Gate-In Date & Time', 'ETA Arrival Date & Time', 'Gate-In Time of Day', 'Gate-Out Date & Time', 'ETA Pull-out Date & Time', 'Gate-Out Time of Day', 'Release Customer', 'Storage Fee Type', 'Storage Rate/Day (PHP)', 'Storage Days', 'Van In Amount (PHP)', 'Van In Payment Status', 'Van Out Amount (PHP)', 'Total Billed Amount (PHP)', 'Remarks', 'Gate-In Photos', 'Gate-Out Photos'],
-                    ...(yardDb.containers || []).map(c => [
-                        esc(c.number),
-                        esc(c.size),
-                        esc(c.type || 'Dry'),
-                        esc(c.line),
-                        esc(c.truckingName || ''),
-                        esc(c.plate || ''),
-                        esc(c.driver || ''),
-                        esc(c.eir || ''),
-                        esc(c.condition || 'Good'),
-                        esc(c.status || 'Available'),
-                        esc(c.block || 'A'),
-                        esc(c.bay || 'BAY-1'),
-                        esc(c.row || 'GROUND'),
-                        esc(c.tier || '1'),
-                        esc(c.date || ''),
-                        esc(c.etaDate || ''),
-                        esc(c.gateInToD || ''),
-                        esc(c.gateOutDate || ''),
-                        esc(c.etaPulloutDate || ''),
-                        esc(c.gateOutToD || ''),
-                        esc(c.releaseCustomer || ''),
-                        esc(c.storageFeeType || ''),
-                        c.storageRate || '',
-                        c.storageDays || '',
-                        c.vanInAmount || 0,
-                        esc(c.vanInStats || 'PAID'),
-                        c.vanOutAmount || 0,
-                        c.totalBilledAmount || '',
-                        esc(c.remarks || ''),
-                        (c.photos || []).length,
-                        (c.releasePhotos || []).length
-                    ])
+                    ...(yardDb.containers || []).map(c => {
+                        const numUpper = (c.number || '').trim().toUpperCase();
+                        const gateInRemark = (c.remarks || '').trim();
+                        const matchingOutMoves = gateOutMovements.filter(
+                            m => (m.container || '').trim().toUpperCase() === numUpper && (m.remarks || '').trim()
+                        );
+                        let combinedRemarks = gateInRemark;
+                        matchingOutMoves.forEach(m => {
+                            const outRem = (m.remarks || '').trim();
+                            if (!outRem) return;
+                            if (!combinedRemarks) {
+                                combinedRemarks = `Gate-Out: ${outRem}`;
+                            } else if (!combinedRemarks.toLowerCase().includes(outRem.toLowerCase())) {
+                                combinedRemarks = `${combinedRemarks} | Gate-Out: ${outRem}`;
+                            }
+                        });
+
+                        return [
+                            esc(c.number),
+                            esc(c.size),
+                            esc(c.type || 'Dry'),
+                            esc(c.line),
+                            esc(c.truckingName || ''),
+                            esc(c.plate || ''),
+                            esc(c.driver || ''),
+                            esc(c.eir || ''),
+                            esc(c.condition || 'Good'),
+                            esc(c.status || 'Available'),
+                            esc(c.block || 'A'),
+                            esc(c.bay || 'BAY-1'),
+                            esc(c.row || 'GROUND'),
+                            esc(c.tier || '1'),
+                            esc(c.date || ''),
+                            esc(c.etaDate || ''),
+                            esc(c.gateInToD || ''),
+                            esc(c.gateOutDate || ''),
+                            esc(c.etaPulloutDate || ''),
+                            esc(c.gateOutToD || ''),
+                            esc(c.releaseCustomer || ''),
+                            esc(c.storageFeeType || ''),
+                            c.storageRate || '',
+                            c.storageDays || '',
+                            c.vanInAmount || 0,
+                            esc(c.vanInStats || 'PAID'),
+                            c.vanOutAmount || 0,
+                            c.totalBilledAmount || '',
+                            esc(combinedRemarks),
+                            (c.photos || []).length,
+                            (c.releasePhotos || []).length
+                        ];
+                    })
                 ];
             } else if (moduleName === 'Revenue & Billings') {
                 csvRows = [
@@ -8814,69 +8833,92 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		// ==========================================
         // BUG FIX #2: FULL CENTERED, UNCROPPED PDF EXPORT FOR VISUAL EXTRACTION REPORT
         // ==========================================
-        async function exportVisualExtractionPDF() {
-            const filterMode = currentExtractionFilter || 'ALL';
-            const exportBtn = document.getElementById('exportVisualPdfBtn');
-            if (exportBtn) {
-                exportBtn.disabled = true;
-                exportBtn.textContent = 'Generating Full PDF...';
-            }
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'pdf-export-wrapper p-5 bg-white text-slate-900 font-sans space-y-4';
-            wrapper.innerHTML = `
-                <div class="flex justify-between items-center border-b-2 border-slate-300 pb-3 mb-3">
-                    <div>
-                        <h1 class="text-xl font-extrabold text-slate-900">SKYMOVER TRANSPORTATION</h1>
-                        <p class="text-xs font-semibold text-slate-600">Visual Extraction Report &amp; Photo Audit • Active Filter: <span class="text-sky-700 font-bold">${filterMode}</span></p>
-                    </div>
-                    <div class="text-right text-[11px] font-mono text-slate-600">
-                        Generated: ${new Date().toLocaleString()}<br>
-                        Complete Uncropped Filter Export
-                    </div>
-                </div>
-                ${buildVisualExtractionSectionsHtml(filterMode)}
-                <div class="mt-4 pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400">
-                    © 2026 Skymover Transport Corporation • Visual Extraction &amp; Photo Audit Report
-                </div>
-            `;
-
-            wrapper.querySelectorAll('.overflow-x-auto').forEach(el => {
-                el.classList.remove('overflow-x-auto');
-                el.style.overflow = 'visible';
-            });
-            wrapper.querySelectorAll('table').forEach(tbl => {
-                tbl.style.width = '100%';
-                tbl.style.tableLayout = 'fixed';
-                tbl.style.fontSize = '10px';
-            });
-            wrapper.querySelectorAll('th, td').forEach(cell => {
-                cell.style.padding = '5px 4px';
-                cell.style.wordBreak = 'break-word';
-                cell.style.overflowWrap = 'anywhere';
-            });
-
-            try {
-                await embedAllImagesInElementForPdf(wrapper);
-
-                await html2pdf().from(wrapper).set({
-                    margin: 0.3,
-                    filename: 'Skymover_Visual_Extraction_' + filterMode + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-                    jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                }).save();
-            } catch (err) {
-                console.error('exportVisualExtractionPDF error:', err);
-                alert('❌ PDF export encountered an error: ' + (err.message || err));
-            } finally {
-                if (exportBtn) {
-                    exportBtn.disabled = false;
-                    exportBtn.textContent = 'Export PDF Report';
-                }
-            }
-        }
+		async function exportVisualExtractionPDF() {
+		    const filterMode = currentExtractionFilter || 'ALL';
+		    const exportBtn = document.getElementById('exportVisualPdfBtn');
+		    if (exportBtn) {
+		        exportBtn.disabled = true;
+		        exportBtn.textContent = 'Generating Full PDF...';
+		    }
+		
+		    const wrapper = document.createElement('div');
+		    wrapper.className = 'pdf-export-wrapper p-5 bg-white text-slate-900 font-sans space-y-4';
+		    wrapper.style.position = 'fixed';
+		    wrapper.style.left = '-10000px';
+		    wrapper.style.top = '0';
+		    wrapper.style.width = '1050px';
+		    wrapper.style.background = '#ffffff';
+		    wrapper.style.zIndex = '-1';
+		
+		    wrapper.innerHTML = `
+		        <div class="flex justify-between items-center border-b-2 border-slate-300 pb-3 mb-3">
+		            <div>
+		                <h1 class="text-xl font-extrabold text-slate-900">SKYMOVER TRANSPORTATION</h1>
+		                <p class="text-xs font-semibold text-slate-600">Visual Extraction Report &amp; Photo Audit • Active Filter: <span class="text-sky-700 font-bold">${escapeHtml(filterMode)}</span></p>
+		            </div>
+		            <div class="text-right text-[11px] font-mono text-slate-600">
+		                Generated: ${new Date().toLocaleString()}<br>
+		                Complete Uncropped Filter Export
+		            </div>
+		        </div>
+		        ${buildVisualExtractionSectionsHtml(filterMode)}
+		        <div class="mt-4 pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400">
+		            © 2026 Skymover Transport Corporation • Visual Extraction &amp; Photo Audit Report
+		        </div>
+		    `;
+		
+		    wrapper.querySelectorAll('.overflow-x-auto').forEach(el => {
+		        el.classList.remove('overflow-x-auto');
+		        el.style.overflow = 'visible';
+		    });
+		    wrapper.querySelectorAll('table').forEach(tbl => {
+		        tbl.style.width = '100%';
+		        tbl.style.tableLayout = 'fixed';
+		        tbl.style.fontSize = '10px';
+		    });
+		    wrapper.querySelectorAll('tr').forEach(row => {
+		        row.style.breakInside = 'avoid';
+		        row.style.pageBreakInside = 'avoid';
+		    });
+		    wrapper.querySelectorAll('th, td').forEach(cell => {
+		        cell.style.padding = '5px 4px';
+		        cell.style.wordBreak = 'break-word';
+		        cell.style.overflowWrap = 'anywhere';
+		    });
+		
+		    document.body.appendChild(wrapper);
+		
+		    try {
+		        await Promise.race([
+		            embedAllImagesInElementForPdf(wrapper),
+		            new Promise(resolve => setTimeout(resolve, 4000))
+		        ]);
+		
+		        await html2pdf().from(wrapper).set({
+		            margin: [0.35, 0.35, 0.35, 0.35],
+		            filename: 'Skymover_Visual_Extraction_' + filterMode + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
+		            image: { type: 'jpeg', quality: 0.95 },
+		            html2canvas: {
+		                scale: 1.5,
+		                useCORS: true,
+		                allowTaint: true,
+		                scrollY: 0,
+		                windowWidth: wrapper.scrollWidth
+		            },
+		            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+		            pagebreak: { mode: ['css', 'legacy'] }
+		        }).save();
+		    } catch (err) {
+		        console.error('exportVisualExtractionPDF error:', err);
+		        alert('❌ PDF export encountered an error: ' + (err.message || err));
+		    } finally {
+		        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+		        if (exportBtn) {
+		            exportBtn.disabled = false;
+		            exportBtn.textContent = 'Export PDF Report';
+		        }
+		    }
+		}
 
         function exportVisualExtractionExcel() {
             generateModuleExcelReport('Empty Container Inventory');
