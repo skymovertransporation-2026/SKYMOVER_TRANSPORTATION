@@ -2826,9 +2826,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     return;
                 }
 
-                checkActiveAuthSession();
-                fetchCloudData();
-                subscribeToRealtimeChanges();
+				checkActiveAuthSession();
             } catch(e) {
                 updateSyncBadge('error', 'Cloud Connection Failed');
                 if (isClientQrMode) {
@@ -2864,9 +2862,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     const loginModal = document.getElementById('loginModal');
                     if (loginModal) loginModal.style.display = 'none';
 
-                    updateAuthUI(currentUser, currentUserRole);
-                    applyRbacPermissions(currentUserRole, true);
-                    resetInactivityTimer();
+					updateAuthUI(currentUser, currentUserRole);
+					applyRbacPermissions(currentUserRole, true);
+					resetInactivityTimer();
+					fetchCloudData();
+					subscribeToRealtimeChanges();
                 } else {
                     currentUser = null;
                     currentUserEmail = '';
@@ -3071,8 +3071,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     recordUserActivityTimestamp();
                     updateAuthUI(currentUser, currentUserRole);
                     closeSkymoverLogin();
-                    applyRbacPermissions(currentUserRole, false);
-                    resetInactivityTimer();
+					applyRbacPermissions(currentUserRole, false);
+					resetInactivityTimer();
+					fetchCloudData();
+					subscribeToRealtimeChanges();
                 }
             } catch(err) {
                 alert('Sign in failed: ' + err.message);
