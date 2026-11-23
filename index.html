@@ -8834,104 +8834,71 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // BUG FIX #2: FULL CENTERED, UNCROPPED PDF EXPORT FOR VISUAL EXTRACTION REPORT
         // ==========================================
 		async function exportVisualExtractionPDF() {
-		    const filterMode = currentExtractionFilter || 'ALL';
-		    const exportBtn = document.getElementById('exportVisualPdfBtn');
-		    if (exportBtn) {
-		        exportBtn.disabled = true;
-		        exportBtn.textContent = 'Generating Full PDF...';
-		    }
-		
-		    const captureWidth = 900;
-		
-		    const host = document.createElement('div');
-		    host.style.position = 'fixed';
-		    host.style.inset = '0';
-		    host.style.background = 'rgba(15, 23, 42, 0.92)';
-		    host.style.overflow = 'auto';
-		    host.style.zIndex = '99999';
-		    host.style.padding = '16px';
-		
-		    const wrapper = document.createElement('div');
-		    wrapper.className = 'pdf-export-wrapper p-4 bg-white text-slate-900 font-sans space-y-4';
-		    wrapper.style.boxSizing = 'border-box';
-		    wrapper.style.width = `${captureWidth}px`;
-		    wrapper.style.maxWidth = `${captureWidth}px`;
-		    wrapper.style.margin = '0';
-		    wrapper.style.background = '#ffffff';
-		
-		    wrapper.innerHTML = `
-		        <div class="flex justify-between items-start gap-4 border-b-2 border-slate-300 pb-3 mb-3">
-		            <div>
-		                <h1 class="text-xl font-extrabold text-slate-900">SKYMOVER TRANSPORTATION</h1>
-		                <p class="text-xs font-semibold text-slate-600">Visual Extraction Report &amp; Photo Audit • Active Filter: <span class="text-sky-700 font-bold">${escapeHtml(filterMode)}</span></p>
-		            </div>
-		            <div class="text-right text-[11px] font-mono text-slate-600 shrink-0">
-		                Generated: ${new Date().toLocaleString()}<br>
-		                Complete Uncropped Filter Export
-		            </div>
-		        </div>
-		        ${buildVisualExtractionSectionsHtml(filterMode)}
-		        <div class="mt-4 pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400">
-		            © 2026 Skymover Transport Corporation • Visual Extraction &amp; Photo Audit Report
-		        </div>
-		    `;
-		
-		    wrapper.querySelectorAll('.overflow-x-auto').forEach(el => {
-		        el.classList.remove('overflow-x-auto');
-		        el.style.overflow = 'visible';
-		        el.style.width = '100%';
-		    });
-		    wrapper.querySelectorAll('table').forEach(tbl => {
-		        tbl.style.width = '100%';
-		        tbl.style.tableLayout = 'fixed';
-		        tbl.style.fontSize = '9.5px';
-		    });
-		    wrapper.querySelectorAll('tr').forEach(row => {
-		        row.style.breakInside = 'avoid';
-		        row.style.pageBreakInside = 'avoid';
-		    });
-		    wrapper.querySelectorAll('th, td').forEach(cell => {
-		        cell.style.padding = '5px 4px';
-		        cell.style.wordBreak = 'break-word';
-		        cell.style.overflowWrap = 'anywhere';
-		    });
-		
-		    host.appendChild(wrapper);
-		    document.body.appendChild(host);
-		
-		    try {
-		        await Promise.race([
-		            embedAllImagesInElementForPdf(wrapper),
-		            new Promise(resolve => setTimeout(resolve, 4000))
-		        ]);
-		
-		        await html2pdf().from(wrapper).set({
-		            margin: [0.3, 0.3, 0.3, 0.3],
-		            filename: 'Skymover_Visual_Extraction_' + filterMode + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
-		            image: { type: 'jpeg', quality: 0.95 },
-		            html2canvas: {
-		                scale: 1.5,
-		                useCORS: true,
-		                allowTaint: true,
-		                width: captureWidth,
-		                windowWidth: captureWidth,
-		                scrollX: 0,
-		                scrollY: 0
-		            },
-		            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-		            pagebreak: { mode: ['css', 'legacy'] }
-		        }).save();
-		    } catch (err) {
-		        console.error('exportVisualExtractionPDF error:', err);
-		        alert('❌ PDF export encountered an error: ' + (err.message || err));
-		    } finally {
-		        if (host.parentNode) host.parentNode.removeChild(host);
-		        if (exportBtn) {
-		            exportBtn.disabled = false;
-		            exportBtn.textContent = 'Export PDF Report';
-		        }
-		    }
-		}
+            const filterMode = currentExtractionFilter || 'ALL';
+            const exportBtn = document.getElementById('exportVisualPdfBtn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Generating Full PDF...';
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-export-wrapper p-5 bg-white text-slate-900 font-sans space-y-4';
+            wrapper.innerHTML = `
+                <div class="flex justify-between items-center border-b-2 border-slate-300 pb-3 mb-3">
+                    <div>
+                        <h1 class="text-xl font-extrabold text-slate-900">SKYMOVER TRANSPORTATION</h1>
+                        <p class="text-xs font-semibold text-slate-600">Visual Extraction Report &amp; Photo Audit • Active Filter: <span class="text-sky-700 font-bold">${escapeHtml(filterMode)}</span></p>
+                    </div>
+                    <div class="text-right text-[11px] font-mono text-slate-600">
+                        Generated: ${new Date().toLocaleString()}<br>
+                        Complete Uncropped Filter Export
+                    </div>
+                </div>
+                ${buildVisualExtractionSectionsHtml(filterMode)}
+                <div class="mt-4 pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400">
+                    © 2026 Skymover Transport Corporation • Visual Extraction &amp; Photo Audit Report
+                </div>
+            `;
+
+            wrapper.querySelectorAll('.overflow-x-auto').forEach(el => {
+                el.classList.remove('overflow-x-auto');
+                el.style.overflow = 'visible';
+            });
+            wrapper.querySelectorAll('table').forEach(tbl => {
+                tbl.style.width = '100%';
+                tbl.style.tableLayout = 'fixed';
+                tbl.style.fontSize = '10px';
+            });
+            wrapper.querySelectorAll('th, td').forEach(cell => {
+                cell.style.padding = '5px 4px';
+                cell.style.wordBreak = 'break-word';
+                cell.style.overflowWrap = 'anywhere';
+            });
+
+            try {
+                await Promise.race([
+                    embedAllImagesInElementForPdf(wrapper),
+                    new Promise(resolve => setTimeout(resolve, 4000))
+                ]);
+
+                await html2pdf().from(wrapper).set({
+                    margin: 0.3,
+                    filename: 'Skymover_Visual_Extraction_' + filterMode + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                }).save();
+            } catch (err) {
+                console.error('exportVisualExtractionPDF error:', err);
+                alert('❌ PDF export encountered an error: ' + (err.message || err));
+            } finally {
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = 'Export PDF Report';
+                }
+            }
+        }
 
         function exportVisualExtractionExcel() {
             generateModuleExcelReport('Empty Container Inventory');
