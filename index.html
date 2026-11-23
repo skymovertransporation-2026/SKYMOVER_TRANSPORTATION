@@ -1671,6 +1671,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             size: c.size || '—',
                             type: c.container_type || 'Dry',
                             line: c.shipping_line || '—',
+							truckingName: c.trucking_name || c.truckingName || '',
+							plate: c.truck_plate || c.truck_plate_number || c.plate || '',
+							driver: c.driver_name || c.driver || '',
+							eir: c.eir_ref || c.eir || '',
                             condition: c.condition || 'Good',
                             status: c.status || 'Pending',
                             block: c.block || 'A',
@@ -1679,8 +1683,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             tier: c.tier || '1',
                             storageDays: c.storage_days ?? null,
                             date: formatIsoToLocalDateTimeInput(c.gate_in_date),
-                            gateOutDate: c.gate_out_date ? formatIsoToLocalDateTimeInput(c.gate_out_date) : null
+                            gateOutDate: c.gate_out_date ? formatIsoToLocalDateTimeInput(c.gate_out_date) : null,
+							remarks: c.remarks || ''
                         };
+			                window.lastClientQrSearchRecord = record;
                     }
                 }
 
