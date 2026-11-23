@@ -3592,13 +3592,31 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     refreshDriverSmsInbox();
                 });
 
+				let yardRealtimeDebounceTimer = null;
+                const scheduleRealtimeYardSync = () => {
+                    if (isSavingCloudData) return;
+                    clearTimeout(yardRealtimeDebounceTimer);
+                    yardRealtimeDebounceTimer = setTimeout(async () => {
+                        await Promise.all([
+                            fetchYardContainersFromSupabase(),
+                            fetchYardMovementsFromSupabase(),
+                            fetchYardRevenuesFromSupabase()
+                        ]);
+                        deduplicateAllCollections();
+                        refreshYard();
+                        renderYardReports();
+                        renderYardRevenue();
+                        populateYardOutContainerDropdown();
+                    }, 250);
+                };
+
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'geofence_zones' }, () => { if (!isSavingCloudData) fetchLogiTrackDataFromSupabase(); });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'fleet_expenses' }, () => { if (!isSavingCloudData) fetchFleetExpensesFromSupabase(); });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_expenses' }, () => { if (!isSavingCloudData) fetchYardExpensesFromSupabase(); });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_logs' }, () => { if (!isSavingCloudData) fetchMaintenanceLogsFromSupabase(); });
-                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_containers' }, () => { if (!isSavingCloudData) fetchYardContainersFromSupabase(); });
-                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_revenues' }, () => { if (!isSavingCloudData) fetchYardRevenuesFromSupabase(); });
-                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_movements' }, () => { if (!isSavingCloudData) fetchYardMovementsFromSupabase(); });
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_containers' }, scheduleRealtimeYardSync);
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_revenues' }, scheduleRealtimeYardSync);
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_movements' }, scheduleRealtimeYardSync);
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'hub_locations' }, () => { if (!isSavingCloudData) fetchHubLocationsFromSupabase(); });
 
                 channel.subscribe((status, err) => {
@@ -9905,19 +9923,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if(document.getElementById('totalExpenseDisplay')) document.getElementById('totalExpenseDisplay').innerText = '₱' + totalExp.toLocaleString('en-US', {minimumFractionDigits: 2});
         }
 
-        function renderYardReports() {
-            const giCount = (yardDb.containers || []).length;
-            const goCount = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT').length;
-            const movesCount = (yardDb.movements || []).length;
+		function renderYardReports() {
+            deduplicateAllCollections();
+
+            const containers = yardDb.containers || [];
+            const movements = yardDb.movements || [];
+            const gateInMoves = movements.filter(m => m.kind === 'GATE-IN');
+            const goCount = movements.filter(m => m.kind === 'GATE-OUT').length;
+            const movesCount = movements.length;
             const isAdmin = currentUserRole === 'admin';
 
+            const uniqueGateInSet = new Set(
+                gateInMoves.map(m => (m.container || '').trim().toUpperCase()).filter(Boolean)
+            );
+            containers.forEach(c => {
+                const num = (c.number || '').trim().toUpperCase();
+                if (num) uniqueGateInSet.add(num);
+            });
+            const giCount = Math.max(gateInMoves.length, containers.length, uniqueGateInSet.size);
+
             let linesMap = {};
-            (yardDb.containers || []).forEach(c => {
-                if(!linesMap[c.line]) linesMap[c.line] = { total: 0, avail: 0, res: 0, dam: 0 };
+            containers.forEach(c => {
+                if (!linesMap[c.line]) linesMap[c.line] = { total: 0, avail: 0, res: 0, dam: 0 };
                 linesMap[c.line].total++;
-                if(c.status === 'Available') linesMap[c.line].avail++;
-                else if(c.status === 'Reserved') linesMap[c.line].res++;
-                else if(c.status === 'Hold' || c.condition === 'Damaged') linesMap[c.line].dam++;
+                if (c.status === 'Available') linesMap[c.line].avail++;
+                else if (c.status === 'Reserved') linesMap[c.line].res++;
+                else if (c.status === 'Hold' || c.condition === 'Damaged') linesMap[c.line].dam++;
             });
 
             document.getElementById('yardRptGateIn').innerText = giCount;
