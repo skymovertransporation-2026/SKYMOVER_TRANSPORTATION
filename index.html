@@ -7704,6 +7704,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         const num = (c.number || '').trim().toUpperCase();
                         return c.status !== 'Released' ? `active_cnt:${num}` : (c.id ? `id:${c.id}` : `rel_cnt:${num}_${(c.gateOutDate || c.date || '').trim()}`);
                     });
+					deduplicateAllCollections();
                     refreshYard();
                     populateYardOutContainerDropdown();
                 }
@@ -7768,6 +7769,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         remarks: m.remarks || '', photos: Array.isArray(m.photos) ? m.photos : []
                     }));
                     yardDb.movements = mergeRecordsSafely(yardDb.movements, cloudMoves, m => m.id ? `id:${m.id}` : `key:${m.kind}_${m.container}_${m.date}`);
+					deduplicateAllCollections();
                     refreshYardDashboard();
                     renderYardReports();
                 }
@@ -8931,7 +8933,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             renderYardInventory();
         }
 
-        function refreshYardDashboard() {
+		function refreshYardDashboard() {
+            deduplicateAllCollections();
+
             const containers = yardDb.containers || [];
             const activeContainers = containers.filter(c => c.status !== 'Released');
             const totalCount = activeContainers.length;
@@ -8939,23 +8943,40 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const reservedCount = activeContainers.filter(c => c.status === 'Reserved').length;
             const damagedCount = activeContainers.filter(c => c.status === 'Hold' || c.condition === 'Damaged').length;
 
-            if(document.getElementById('yardTotal')) document.getElementById('yardTotal').innerText = totalCount;
-            if(document.getElementById('yardAvailable')) document.getElementById('yardAvailable').innerText = availableCount;
-            if(document.getElementById('yardReserved')) document.getElementById('yardReserved').innerText = reservedCount;
-            if(document.getElementById('yardDamaged')) document.getElementById('yardDamaged').innerText = damagedCount;
+            if (document.getElementById('yardTotal')) document.getElementById('yardTotal').innerText = totalCount;
+            if (document.getElementById('yardAvailable')) document.getElementById('yardAvailable').innerText = availableCount;
+            if (document.getElementById('yardReserved')) document.getElementById('yardReserved').innerText = reservedCount;
+            if (document.getElementById('yardDamaged')) document.getElementById('yardDamaged').innerText = damagedCount;
 
             const gateInMoves = (yardDb.movements || []).filter(m => m.kind === 'GATE-IN');
-            const gateOutMoves = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
+            const uniqueGateInContainers = new Set(
+                gateInMoves.map(m => (m.container || '').trim().toUpperCase()).filter(Boolean)
+            );
+            activeContainers.forEach(c => {
+                const num = (c.number || '').trim().toUpperCase();
+                if (num) uniqueGateInContainers.add(num);
+            });
 
-            if(document.getElementById('dashGateInCount')) document.getElementById('dashGateInCount').innerText = gateInMoves.length;
-            if(document.getElementById('dashGateOutCount')) document.getElementById('dashGateOutCount').innerText = gateOutMoves.length;
+            const gateOutMoves = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
+            const uniqueGateOutContainers = new Set(
+                gateOutMoves.map(m => (m.container || '').trim().toUpperCase()).filter(Boolean)
+            );
+
+            if (document.getElementById('dashGateInCount')) {
+                document.getElementById('dashGateInCount').innerText = Math.max(gateInMoves.length, uniqueGateInContainers.size);
+            }
+            if (document.getElementById('dashGateOutCount')) {
+                document.getElementById('dashGateOutCount').innerText = uniqueGateOutContainers.size;
+            }
 
             let totalRev = 0;
             (yardDb.revenues || []).forEach(r => { totalRev += Number(r.amount || 0); });
-            if(document.getElementById('dashTotalRev')) document.getElementById('dashTotalRev').innerText = '₱' + totalRev.toLocaleString('en-US', {minimumFractionDigits: 2});
+            if (document.getElementById('dashTotalRev')) {
+                document.getElementById('dashTotalRev').innerText = '₱' + totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 });
+            }
 
-			const recentBody = document.getElementById('yardRecentBody');
-            if(recentBody) {
+            const recentBody = document.getElementById('yardRecentBody');
+            if (recentBody) {
                 const recent = (yardDb.movements || []).slice(0, 10);
                 recentBody.innerHTML = recent.length ? recent.map(m => `
                     <tr class="border-b">
@@ -8964,7 +8985,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
-                        <td class="p-3 font-bold text-emerald-700">₱${Number(m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="p-3 font-bold text-emerald-700">₱${Number(m.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     </tr>
                 `).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500">No recent movements logged.</td></tr>';
             }
