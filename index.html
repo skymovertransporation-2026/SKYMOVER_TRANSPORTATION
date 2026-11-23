@@ -8841,6 +8841,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        exportBtn.textContent = 'Generating Full PDF...';
 		    }
 		
+		    const captureWidth = 960;
+		
 		    const host = document.createElement('div');
 		    host.style.position = 'fixed';
 		    host.style.inset = '0';
@@ -8851,17 +8853,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		
 		    const wrapper = document.createElement('div');
 		    wrapper.className = 'pdf-export-wrapper p-5 bg-white text-slate-900 font-sans space-y-4';
-		    wrapper.style.width = '1050px';
+		    wrapper.style.boxSizing = 'border-box';
+		    wrapper.style.width = `${captureWidth}px`;
+		    wrapper.style.maxWidth = `${captureWidth}px`;
 		    wrapper.style.margin = '0 auto';
 		    wrapper.style.background = '#ffffff';
 		
 		    wrapper.innerHTML = `
-		        <div class="flex justify-between items-center border-b-2 border-slate-300 pb-3 mb-3">
+		        <div class="flex justify-between items-start gap-4 border-b-2 border-slate-300 pb-3 mb-3">
 		            <div>
 		                <h1 class="text-xl font-extrabold text-slate-900">SKYMOVER TRANSPORTATION</h1>
 		                <p class="text-xs font-semibold text-slate-600">Visual Extraction Report &amp; Photo Audit • Active Filter: <span class="text-sky-700 font-bold">${escapeHtml(filterMode)}</span></p>
 		            </div>
-		            <div class="text-right text-[11px] font-mono text-slate-600">
+		            <div class="text-right text-[11px] font-mono text-slate-600 shrink-0">
 		                Generated: ${new Date().toLocaleString()}<br>
 		                Complete Uncropped Filter Export
 		            </div>
@@ -8875,11 +8879,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		    wrapper.querySelectorAll('.overflow-x-auto').forEach(el => {
 		        el.classList.remove('overflow-x-auto');
 		        el.style.overflow = 'visible';
+		        el.style.width = '100%';
 		    });
 		    wrapper.querySelectorAll('table').forEach(tbl => {
 		        tbl.style.width = '100%';
 		        tbl.style.tableLayout = 'fixed';
-		        tbl.style.fontSize = '10px';
+		        tbl.style.fontSize = '9.5px';
 		    });
 		    wrapper.querySelectorAll('tr').forEach(row => {
 		        row.style.breakInside = 'avoid';
@@ -8901,15 +8906,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        ]);
 		
 		        await html2pdf().from(wrapper).set({
-		            margin: [0.35, 0.35, 0.35, 0.35],
+		            margin: [0.3, 0.3, 0.3, 0.3],
 		            filename: 'Skymover_Visual_Extraction_' + filterMode + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
 		            image: { type: 'jpeg', quality: 0.95 },
 		            html2canvas: {
 		                scale: 1.5,
 		                useCORS: true,
 		                allowTaint: true,
-		                scrollY: 0,
-		                windowWidth: wrapper.scrollWidth
+		                width: captureWidth,
+		                windowWidth: captureWidth,
+		                scrollX: 0,
+		                scrollY: 0
 		            },
 		            jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
 		            pagebreak: { mode: ['css', 'legacy'] }
