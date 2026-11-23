@@ -1796,24 +1796,60 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
 		function useSearchedContainerForGateOut(containerNo) {
-            if (!containerNo) return;
-            switchYardTab('yardGateOut');
+		    if (!containerNo) return;
+		    switchYardTab('yardGateOut');
+		    applyGateInDetailsToGateOutForm(containerNo);
+		
+		    const gateOutSection = document.getElementById('yardGateOut');
+		    if (gateOutSection) {
+		        gateOutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		    }
+		
+		    const customerInput = document.getElementById('gateOutCustomer');
+		    if (customerInput) {
+		        setTimeout(() => customerInput.focus(), 300);
+		    }
+		}
 
-            const outInput = document.getElementById('yardOutContainerInput');
-            if (outInput) {
-                outInput.value = containerNo.trim().toUpperCase();
-            }
-
-            const gateOutSection = document.getElementById('yardGateOut');
-            if (gateOutSection) {
-                gateOutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-
-            const customerInput = document.getElementById('gateOutCustomer');
-            if (customerInput) {
-                setTimeout(() => customerInput.focus(), 300);
-            }
-        }
+		function applyGateInDetailsToGateOutForm(containerNo, recordOverride = null) {
+		    const cleanNo = (containerNo || '').trim().toUpperCase();
+		    if (!cleanNo) return;
+		
+		    const match = recordOverride || (Array.isArray(yardDb?.containers)
+		        ? (yardDb.containers.find(c => (c.number || '').trim().toUpperCase() === cleanNo && c.status !== 'Released')
+		            || yardDb.containers.find(c => (c.number || '').trim().toUpperCase() === cleanNo))
+		        : null);
+		
+		    const outInput = document.getElementById('yardOutContainerInput');
+		    const outSelect = document.getElementById('yardOutContainer');
+		    if (outInput) outInput.value = cleanNo;
+		
+		    let matchedSelectOption = false;
+		    if (outSelect && !isClientQrMode) {
+		        matchedSelectOption = Array.from(outSelect.options).some(
+		            opt => (opt.value || '').trim().toUpperCase() === cleanNo
+		        );
+		        if (matchedSelectOption) outSelect.value = cleanNo;
+		    }
+		
+		    if (!match) return;
+		
+		    const plateEl = document.getElementById('gateOutPlate');
+		    const driverEl = document.getElementById('gateOutDriver');
+		    const customerEl = document.getElementById('gateOutCustomer');
+		    const eirEl = document.getElementById('gateOutEir');
+		    const remarksEl = document.getElementById('gateOutRemarks');
+		
+		    if (plateEl) plateEl.value = match.plate ? String(match.plate).trim().toUpperCase() : '';
+		    if (driverEl) driverEl.value = match.driver ? String(match.driver).trim() : '';
+		    if (customerEl) customerEl.value = String(match.releaseCustomer || match.truckingName || '').trim();
+		    if (eirEl) eirEl.value = match.eir ? String(match.eir).trim() : '';
+		    if (remarksEl) remarksEl.value = match.remarks ? String(match.remarks).trim() : '';
+		
+		    if (!isClientQrMode && matchedSelectOption && typeof containerSelectedForGateOut === 'function') {
+		        containerSelectedForGateOut();
+		    }
+		}
 		
         function openClientQrModal() {
             if (!requireYardOperationExecution("generate or configure Client QR Access")) return;
