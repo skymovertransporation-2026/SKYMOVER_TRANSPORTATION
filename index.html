@@ -7715,37 +7715,63 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		async function fetchYardContainersFromSupabase() {
             if (!supabaseClient) return;
             try {
-                const { data, error } = await supabaseClient.from('yard_containers').select('*').order('created_at', { ascending: false });
-                if (!error && data && data.length > 0) {
+                const { data, error } = await supabaseClient
+                    .from('yard_containers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) return;
+
+                if (Array.isArray(data)) {
                     const cloudContainers = data.map(c => ({
-                        id: c.id, number: c.container_number, size: c.size, type: c.container_type || 'Dry',
-                        line: c.shipping_line, truckingName: c.trucking_name || '', plate: c.truck_plate,
-                        driver: c.driver_name || '', eir: c.eir_ref || '', condition: c.condition || 'Good',
-                        status: c.status || 'Available', block: c.block || 'A', bay: c.bay || 'BAY-1',
-                        row: c.yard_row || 'GROUND', tier: c.tier || '1',
-                        vanInAmount: Number(c.van_in_amount || 0), vanInStats: c.van_in_status || 'PAID',
+                        id: c.id,
+                        number: c.container_number,
+                        size: c.size,
+                        type: c.container_type || 'Dry',
+                        line: c.shipping_line,
+                        truckingName: c.trucking_name || '',
+                        plate: c.truck_plate,
+                        driver: c.driver_name || '',
+                        eir: c.eir_ref || '',
+                        condition: c.condition || 'Good',
+                        status: c.status || 'Available',
+                        block: c.block || 'A',
+                        bay: c.bay || 'BAY-1',
+                        row: c.yard_row || 'GROUND',
+                        tier: c.tier || '1',
+                        vanInAmount: Number(c.van_in_amount || 0),
+                        vanInStats: c.van_in_status || 'PAID',
                         vanOutAmount: Number(c.van_out_amount || 0),
                         date: formatIsoToLocalDateTimeInput(c.gate_in_date),
                         etaDate: formatIsoToLocalDateTimeInput(c.eta_date),
                         gateInToD: c.gate_in_tod || 'MORNING',
                         gateOutDate: c.gate_out_date ? formatIsoToLocalDateTimeInput(c.gate_out_date) : null,
                         etaPulloutDate: c.eta_pullout_date ? formatIsoToLocalDateTimeInput(c.eta_pullout_date) : null,
-                        gateOutToD: c.gate_out_tod || null, releaseCustomer: c.release_customer || '',
+                        gateOutToD: c.gate_out_tod || null,
+                        releaseCustomer: c.release_customer || '',
                         storageFeeType: c.storage_fee_type || '',
                         storageRate: c.storage_rate !== null && c.storage_rate !== undefined ? Number(c.storage_rate) : null,
                         storageDays: c.storage_days !== null && c.storage_days !== undefined ? Number(c.storage_days) : null,
                         totalBilledAmount: c.total_billed_amount !== null && c.total_billed_amount !== undefined ? Number(c.total_billed_amount) : null,
-                        remarks: c.remarks || '', photos: c.photos || [], releasePhotos: c.release_photos || []
+                        remarks: c.remarks || '',
+                        photos: c.photos || [],
+                        releasePhotos: c.release_photos || []
                     }));
-                    yardDb.containers = mergeRecordsSafely(yardDb.containers, cloudContainers, c => {
-                        const num = (c.number || '').trim().toUpperCase();
-                        return c.status !== 'Released' ? `active_cnt:${num}` : (c.id ? `id:${c.id}` : `rel_cnt:${num}_${(c.gateOutDate || c.date || '').trim()}`);
-                    });
-					deduplicateAllCollections();
+
+                    // Keep only local items that do not have a cloud ID yet (newly created offline)
+                    const pendingLocalOnly = (yardDb.containers || []).filter(localItem => !localItem || !localItem.id);
+                    const cloudIds = new Set(cloudContainers.map(c => String(c.id)));
+                    const remainingLocal = pendingLocalOnly.filter(l => !l.id || !cloudIds.has(String(l.id)));
+
+                    yardDb.containers = [...cloudContainers, ...remainingLocal];
+                    deduplicateAllCollections();
+                    safeLocalStorageSet(YARD_KEY, yardDb);
                     refreshYard();
                     populateYardOutContainerDropdown();
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn('fetchYardContainersFromSupabase notice:', e.message || e);
+            }
         }
 
 		async function fetchYardRevenuesFromSupabase() {
