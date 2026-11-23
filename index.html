@@ -1690,12 +1690,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     }
                 }
 
-                // Local fallback only if offline / not yet synced
+				// Local fallback only if offline / not yet synced
                 if (!record && Array.isArray(yardDb.containers)) {
                     const localMatches = yardDb.containers.filter(
                         c => (c.number || '').trim().toUpperCase() === queryNo
                     );
                     record = localMatches.find(m => m.status !== 'Released') || localMatches[0] || null;
+                    if (record) window.lastClientQrSearchRecord = record;
                 }
 
                 resultEl.classList.remove('hidden');
@@ -1760,12 +1761,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             </div>
                         </div>
 
-                        ${!isReleased ? `
+						${!isReleased ? `
                         <div class="flex justify-end pt-2 border-t border-slate-800">
                             <button
                                 type="button"
                                 data-container="${escapeHtml(record.number)}"
-                                onclick="useSearchedContainerForGateOut(this.dataset.container)"
+                                onclick="useSearchedContainerForGateOut(this.dataset.container, window.lastClientQrSearchRecord)"
                                 class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition inline-flex items-center gap-1.5"
                             >
                                 <i class="fa-solid fa-truck-arrow-right"></i> Use for Gate-Out
@@ -2199,7 +2200,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             return await dispatchReliableYardEmail(recipientEmail, subject, payload);
         }
-	// Sync Echo Guard & In-Flight Lock to prevent Realtime events from wiping newly added rows
+		// Sync Echo Guard & In-Flight Lock to prevent Realtime events from wiping newly added rows
         let isSavingCloudData = false;
         let lastLocalSaveTimestamp = 0;
 
