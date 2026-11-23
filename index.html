@@ -9058,7 +9058,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             const recentBody = document.getElementById('yardRecentBody');
             if (recentBody) {
-                const recent = (yardDb.movements || []).slice(0, 10);
+                const recent = (yardDb.movements || []).slice(0, 100);
                 recentBody.innerHTML = recent.length ? recent.map(m => `
                     <tr class="border-b">
                         <td class="p-3 font-mono text-[11px]">${m.date ? new Date(m.date).toLocaleString() : '—'}</td>
@@ -9297,16 +9297,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         } catch (notifErr) {}
                     }
 
-                    // 4. Sync unified cloud payload & send email alert
+					// 4. Sync unified cloud payload & update UI immediately, then fire email in background
                     await saveCloudData();
-                    const emailResult = await sendGateInEmailNotification(containerData);
                     clearGateInFormAndPhotos();
 
-                    const emailMsg = emailResult && emailResult.sent
-                        ? `\n📧 Email alert delivered to ${emailResult.recipientEmail}.`
-                        : `\n⚠️ Record saved to Database, but email delivery failed (${emailResult ? emailResult.errorDetail || 'check recipient' : 'no email'}).`;
+                    void sendGateInEmailNotification(containerData)
+                        .then(res => {
+                            if (!res || !res.sent) {
+                                console.warn('Client Gate-In email notice:', res && res.errorDetail ? res.errorDetail : 'not sent');
+                            }
+                        })
+                        .catch(err => console.warn('Client Gate-In email error:', err));
 
-                    alert(`✅ Gate-In Entry (${containerNo}) saved directly to Database for Yard Personnel review! Electronic waiver signed by ${waiverSignature}.${emailMsg}`);
+                    alert(`✅ Gate-In Entry (${containerNo}) saved directly to Database for Yard Personnel review! Electronic waiver signed by ${waiverSignature}.`);
                 } catch (err) {
                     alert(`❌ Failed to save Gate-In entry: ${err.message || err}`);
                 } finally {
@@ -9432,17 +9435,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     await insertYardRevenueToSupabase(revenueRecord);
                 }
 
-                await saveCloudData();
-                const emailResult = await sendGateInEmailNotification(containerData);
+				await saveCloudData();
                 clearGateInFormAndPhotos();
                 populateYardOutContainerDropdown();
-
-                const emailMsg = emailResult && emailResult.sent
-                    ? `\n📧 Automated email notification sent to ${emailResult.recipientEmail}.`
-                    : `\n⚠️ Record saved, but email delivery failed (${emailResult ? emailResult.errorDetail || 'check recipient' : 'no email'}).`;
-
-                alert(`✅ Container Gate-In (${containerNo}) successfully recorded and synced with cloud database!${emailMsg}`);
                 switchYardTab('yardInventory');
+
+                void sendGateInEmailNotification(containerData)
+                    .then(res => {
+                        if (!res || !res.sent) {
+                            console.warn('Gate-In email notice:', res && res.errorDetail ? res.errorDetail : 'not sent');
+                        }
+                    })
+                    .catch(err => console.warn('Gate-In email error:', err));
+
+                alert(`✅ Container Gate-In (${containerNo}) successfully recorded and synced with cloud database!`);
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
@@ -9707,8 +9713,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 await insertYardRevenueToSupabase(revenueRecord);
             }
 
-            await saveCloudData();
-            await sendGateOutEmailNotification({
+			await saveCloudData();
+            form.reset();
+            clearGateOutPhotos();
+            populateYardOutContainerDropdown();
+            switchYardTab('yardInventory');
+
+            void sendGateOutEmailNotification({
                 container_number: containerNo,
                 release_to_customer: customer,
                 truck_plate_number: match.plate || '',
@@ -9718,13 +9729,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 gate_out_time_of_day: gateOutToD,
                 remarks: remarks,
                 photos: [...stagedGateOutPhotos]
-            });
+            })
+                .then(res => {
+                    if (!res || !res.sent) {
+                        console.warn('Gate-Out email notice:', res && res.errorDetail ? res.errorDetail : 'not sent');
+                    }
+                })
+                .catch(err => console.warn('Gate-Out email error:', err));
 
-            form.reset();
-            clearGateOutPhotos();
-            populateYardOutContainerDropdown();
             alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
-            switchYardTab('yardInventory');
         }
 
         function renderYardRevenue() {
@@ -10239,3 +10252,4 @@ Skymover Transport is not liable for charges incurred due to operational constra
     </script>
 </body>
 </html>
+
