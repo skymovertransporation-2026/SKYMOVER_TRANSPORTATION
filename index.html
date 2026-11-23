@@ -8841,7 +8841,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        exportBtn.textContent = 'Generating Full PDF...';
 		    }
 		
-		    const captureWidth = 960;
+		    const captureWidth = 900;
 		
 		    const host = document.createElement('div');
 		    host.style.position = 'fixed';
@@ -8849,14 +8849,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		    host.style.background = 'rgba(15, 23, 42, 0.92)';
 		    host.style.overflow = 'auto';
 		    host.style.zIndex = '99999';
-		    host.style.padding = '24px';
+		    host.style.padding = '16px';
 		
 		    const wrapper = document.createElement('div');
-		    wrapper.className = 'pdf-export-wrapper p-5 bg-white text-slate-900 font-sans space-y-4';
+		    wrapper.className = 'pdf-export-wrapper p-4 bg-white text-slate-900 font-sans space-y-4';
 		    wrapper.style.boxSizing = 'border-box';
 		    wrapper.style.width = `${captureWidth}px`;
 		    wrapper.style.maxWidth = `${captureWidth}px`;
-		    wrapper.style.margin = '0 auto';
+		    wrapper.style.margin = '0';
 		    wrapper.style.background = '#ffffff';
 		
 		    wrapper.innerHTML = `
