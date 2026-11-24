@@ -6032,70 +6032,84 @@ Skymover Transport is not liable for charges incurred due to operational constra
             `;
         }
 
-        async function handleNewUserSubmit(e) {
-            e.preventDefault();
-            if (!requireAdminExecution("create or modify user accounts")) return;
-            const emailInput = document.getElementById('newUserEmail');
-            const passwordInput = document.getElementById('newUserPassword');
-            const roleSelect = document.getElementById('newUserRole');
-
-            if (!emailInput || !passwordInput || !roleSelect) return;
-
-            const email = emailInput.value.trim().toLowerCase();
-            const password = passwordInput.value;
-            const role = roleSelect.value;
-
-            if (!email || !password) {
-                alert('Please fill in both email and temporary password.');
-                return;
-            }
-
-            if (!db.systemUsers) db.systemUsers = [];
-
-            const existingIndex = db.systemUsers.findIndex(u => (u.email || '').trim().toLowerCase() === email);
-            if (existingIndex >= 0) {
-                alert(`⚠️ Duplicate User Blocked: ${email} is already provisioned. Use "Edit Role" to update their permissions.`);
-                return;
-            }
-
-            let createdAuthUserId = null;
-
-            if (supabaseClient) {
-                try {
-                    const { data: sessionData } = await supabaseClient.auth.getSession();
-                    const currentSession = sessionData ? sessionData.session : null;
-
-                    const { data, error } = await supabaseClient.auth.signUp({
-                        email: email,
-                        password: password,
-                        options: { data: { role: role } }
-                    });
-
-                    if (error) {
-                        alert("Database Auth Notice: " + error.message);
-                        return;
-                    }
-
-                    if (data && data.user && data.user.id) createdAuthUserId = data.user.id;
-
-                    if (currentSession) {
-                        await supabaseClient.auth.setSession({
-                            access_token: currentSession.access_token,
-                            refresh_token: currentSession.refresh_token
-                        });
-                    }
-                } catch(err) {
-                    console.error("Supabase user provisioning exception:", err);
-                }
-            }
-
-            db.systemUsers.push({ id: createdAuthUserId, email, role, createdAt: new Date().toISOString() });
-            await saveCloudData();
-
-            alert(`✅ Successfully provisioned user account for ${email} with role [${role.toUpperCase()}]. Saved to cloud & Database Authentication.`);
-            closeSubModule();
-            openSubModule('User Management');
-        }
+		async function handleNewUserSubmit(e) {
+		    e.preventDefault();
+		    if (!requireAdminExecution("create or modify user accounts")) return;
+		
+		    const emailInput = document.getElementById('newUserEmail');
+		    const passwordInput = document.getElementById('newUserPassword');
+		    const roleSelect = document.getElementById('newUserRole');
+		    const submitBtn = e.target.querySelector('button[type="submit"]');
+		    if (!emailInput || !passwordInput || !roleSelect) return;
+		
+		    const email = emailInput.value.trim().toLowerCase();
+		    const password = passwordInput.value;
+		    const role = roleSelect.value;
+		
+		    if (!email || !password) {
+		        alert('Please fill in both email and temporary password.');
+		        return;
+		    }
+		
+		    if (!db.systemUsers) db.systemUsers = [];
+		    if (db.systemUsers.some(u => (u.email || '').trim().toLowerCase() === email)) {
+		        alert(`⚠️ Duplicate User Blocked: ${email} is already provisioned. Use "Edit Role" to update their permissions.`);
+		        return;
+		    }
+		
+		    if (submitBtn) {
+		        submitBtn.disabled = true;
+		        submitBtn.textContent = 'Creating Account...';
+		    }
+		
+		    let createdAuthUserId = null;
+		
+		    try {
+		        if (supabaseClient) {
+		            // Preferred: Server-side Edge Function using Service Role key (avoids client auth.signUp delays/session swap)
+		            const { data, error } = await supabaseClient.functions.invoke('admin-create-user', {
+		                body: { email, password, role }
+		            });
+		
+		            if (error) {
+		                const status = error.context?.status;
+		                if (status === 504) {
+		                    alert("Database Auth Notice: HTTP 504 (Request timed out on the server/email/hook). Check Supabase Auth Logs & Edge Function logs before retrying.");
+		                } else {
+		                    alert("Database Auth Notice: " + (error.message || 'Failed to provision user'));
+		                }
+		                return;
+		            }
+		
+		            if (data?.error) {
+		                alert("Database Auth Notice: " + data.error);
+		                return;
+		            }
+		
+		            createdAuthUserId = data?.user?.id || data?.id || null;
+		        }
+		
+		        db.systemUsers.push({
+		            id: createdAuthUserId,
+		            email,
+		            role,
+		            createdAt: new Date().toISOString()
+		        });
+		        await saveCloudData();
+		
+		        alert(`✅ Successfully provisioned user account for ${email} with role [${role.toUpperCase()}].`);
+		        closeSubModule();
+		        openSubModule('User Management');
+		    } catch (err) {
+		        console.error("User provisioning exception:", err);
+		        alert("Database Auth Notice: " + (err.message || err));
+		    } finally {
+		        if (submitBtn) {
+		            submitBtn.disabled = false;
+		            submitBtn.textContent = 'Create User Account';
+		        }
+		    }
+		}
 
         async function editSystemUserRole(index) {
             if (!requireAdminExecution("edit a user's assigned role")) return;
