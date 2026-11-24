@@ -7210,7 +7210,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No vehicles registered.</td></tr>';
-                ...
             } else if (title === 'Driver Management') {
                 let rows = drivers.length ? drivers.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No ID attached');
@@ -7233,7 +7232,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="8" class="p-4 text-center text-slate-500 font-medium">No drivers registered.</td></tr>';
-                ...
             } else if (title === 'Fuel Monitoring') {
                 let rows = fuelLogs.length ? fuelLogs.map((f, idx) => {
                     let atts = renderPhotoThumbnailsForReport(f.attachments, 'No receipt');
@@ -7250,7 +7248,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No fuel logs.</td></tr>';
-                ...
             } else if (title === 'Maintenance') {
                 let rows = maintenanceLogs.length ? maintenanceLogs.map((m, idx) => {
                     let atts = renderPhotoThumbnailsForReport(m.attachments, 'No report');
@@ -7267,7 +7264,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No maintenance logs.</td></tr>';
-                ...
             } else if (title === 'GPS & Dispatch') {
                 let rows = dispatchLogs.length ? dispatchLogs.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No waybill');
@@ -7283,7 +7279,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No active dispatches.</td></tr>';
-                ...
             } else if (title === 'Fleet Expenses') {
                 let rows = expenseLogs.length ? expenseLogs.map((e, idx) => {
                     let atts = renderPhotoThumbnailsForReport(e.attachments, 'No receipt');
