@@ -6016,21 +6016,24 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        return;
 		    }
 		
-		    const auditRows = (auditRes.data || []).map(r => ({
-		        _source_table: 'audit_logs',
+		    const auditData = auditRes.data || [];
+		    const skymoverData = skymoverAuditRes.data || [];
+		
+		    const auditRows = auditData.map(r => ({
+		        source_table: 'audit_logs',
 		        _ts: r.changed_at || r.created_at || r.timestamp || '',
-		        raw: r
+		        ...r
 		    }));
 		
-		    const skymoverRows = (skymoverAuditRes.data || []).map(r => ({
-		        _source_table: 'skymover_audit_logs',
+		    const skymoverRows = skymoverData.map(r => ({
+		        source_table: 'skymover_audit_logs',
 		        _ts: r.changed_at || r.created_at || r.timestamp || '',
-		        raw: r
+		        ...r
 		    }));
 		
-		    const combined = [...auditRows, ...skymoverRows].sort((a, b) =>
-		        String(b._ts || '').localeCompare(String(a._ts || ''))
-		    );
+		    const combined = [...auditRows, ...skymoverRows]
+		        .sort((a, b) => String(b._ts || '').localeCompare(String(a._ts || '')))
+		        .map(({ _ts, ...rest }) => rest);
 		
 		    const totalCount = combined.length;
 		    if (totalCount === 0) {
@@ -6038,52 +6041,26 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        return;
 		    }
 		
-		    // 2. Build combined CSV backup and trigger download first
+		    // 2. Build combined JSON backup and trigger download first
 		    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-		    const escapeCsv = (val) => {
-		        if (val === null || val === undefined) return '""';
-		        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-		        return `"${str.replace(/"/g, '""')}"`;
+		    const backupPayload = {
+		        exportedAt: new Date().toISOString(),
+		        exportedBy: currentUserEmail || 'admin',
+		        tables: ['audit_logs', 'skymover_audit_logs'],
+		        counts: {
+		            audit_logs: auditData.length,
+		            skymover_audit_logs: skymoverData.length,
+		            total: totalCount
+		        },
+		        logs: combined
 		    };
 		
-		    const csvRows = [
-		        [
-		            'source_table',
-		            'id',
-		            'timestamp',
-		            'user_id',
-		            'user_email',
-		            'user_role',
-		            'action',
-		            'table_name',
-		            'old_data',
-		            'new_data',
-		            'full_row_json'
-		        ],
-		        ...combined.map(item => {
-		            const r = item.raw || {};
-		            return [
-		                escapeCsv(item._source_table),
-		                escapeCsv(r.id ?? ''),
-		                escapeCsv(item._ts),
-		                escapeCsv(r.user_id ?? ''),
-		                escapeCsv(r.user_email ?? 'System'),
-		                escapeCsv(r.user_role ?? 'API'),
-		                escapeCsv(r.action ?? ''),
-		                escapeCsv(r.table_name ?? ''),
-		                escapeCsv(r.old_data ?? ''),
-		                escapeCsv(r.new_data ?? ''),
-		                escapeCsv(r)
-		            ];
-		        })
-		    ];
-		
-		    const csvString = '\uFEFF' + csvRows.map(row => row.join(',')).join('\n');
-		    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+		    const jsonString = JSON.stringify(backupPayload, null, 2);
+		    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
 		    const blobUrl = URL.createObjectURL(blob);
 		    const dlAnchor = document.createElement('a');
 		    dlAnchor.setAttribute("href", blobUrl);
-		    dlAnchor.setAttribute("download", `Skymover_Combined_Audit_Logs_Backup_${timestamp}.csv`);
+		    dlAnchor.setAttribute("download", `Skymover_Combined_Audit_Logs_Backup_${timestamp}.json`);
 		    document.body.appendChild(dlAnchor);
 		    dlAnchor.click();
 		    dlAnchor.remove();
@@ -6091,7 +6068,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		
 		    // 3. Ask whether to clean ALL logs or only logs older than N days across both tables
 		    const modeInput = prompt(
-		        `✅ Combined CSV backup downloaded (${totalCount} total row(s): ${auditRows.length} in audit_logs, ${skymoverRows.length} in skymover_audit_logs).\n\n` +
+		        `✅ Combined JSON backup downloaded (${totalCount} total row(s): ${auditData.length} in audit_logs, ${skymoverData.length} in skymover_audit_logs).\n\n` +
 		        `Choose cleanup option for BOTH audit tables:\n` +
 		        `• Type ALL to delete all ${totalCount} audit log row(s)\n` +
 		        `• Or enter a number of days (e.g. 30) to delete logs older than that many days\n` +
@@ -6156,7 +6133,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		        return;
 		    }
 		
-		    alert('✅ Combined CSV backup saved and selected logs cleaned from BOTH audit_logs and skymover_audit_logs.');
+		    alert('✅ Combined JSON backup saved and selected logs cleaned from BOTH audit_logs and skymover_audit_logs.');
 		    await loadAuditLogsModal();
 		}
 		
