@@ -3168,7 +3168,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
                 if(error) {
                     alert('Authentication Error: ' + error.message);
-                } else if(data && data.user) {
+					} else if(data && data.user) {
                     currentUser = data.user;
                     currentUserEmail = currentUser.email || '';
                     currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
@@ -3181,6 +3181,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     closeNewDriverRegistrationModal();
                     closeNewTransshipmentModal();
                     closeGeofenceSmsModal();
+
+                    if (submitBtn) { submitBtn.textContent = 'Syncing Records...'; }
+                    updateSyncBadge('syncing', 'Syncing Supabase Records...');
+                    await fetchCloudData();
+                    updateSyncBadge('connected', 'Cloud DB & Storage Bucket Active');
 
                     recordUserActivityTimestamp();
                     updateAuthUI(currentUser, currentUserRole);
