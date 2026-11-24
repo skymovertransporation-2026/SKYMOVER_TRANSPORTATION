@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- QRCode.js for Client-Facing QR Code Generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -721,7 +721,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Van Out Amount (₱)</label><input type="number" id="calcVanOutAmount" name="vanOutAmount" placeholder="0.00" class="p-2 border rounded-lg w-full bg-white text-slate-900 font-bold" oninput="recalculateTotals()"></div>
 
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Storage Fee Type</label><select name="fee" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>Dry Van</option><option>Reefer Van</option><option>Flat Rack</option><option>Open Top</option></select></div>
-                            <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Storage Amount Rate per Day (₱)</label><select name="storageamount" id="calcStorageAmount" class="p-2 border rounded-lg w-full bg-white text-slate-900" onchange="recalculateTotals()"><option value="450">450</option><option value="500">500</option><option value="800">800</option><option value="1000">1000</option></select></div>
+ 							<div class="gate-out-admin-only">
+                                <label class="font-bold text-slate-800 mb-1 block">Storage Amount Rate per Day (₱)</label>
+                                <select name="storageamount" id="calcStorageAmount" class="p-2 border rounded-lg w-full bg-white text-slate-900" onchange="recalculateTotals()">
+                                    <option value="300">300 (CTAP 20ft)</option>
+                                    <option value="400">400 (Regular 20ft)</option>
+                                    <option value="600">600 (CTAP 40ft)</option>
+                                    <option value="800">800 (Regular 40ft)</option>
+                                </select>
+                            </div>
 
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Gate-In Date & Time (Read-only)</label><input type="text" id="calcGateInDisplay" readonly class="p-2 border rounded-lg w-full bg-slate-100 font-mono text-slate-900 font-bold"></div>
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Gate-Out Date & Time *</label><input name="date" id="calcGateOutDate" type="datetime-local" required class="p-2 border rounded-lg w-full bg-white text-slate-900" onchange="recalculateTotals()"></div>
@@ -1262,8 +1270,54 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
     <!-- JAVASCRIPT LOGIC WITH SUPABASE AUTHENTICATION, REAL-TIME WEBSOCKET SYNC, RBAC & CLIENT QR ACCESS -->
     <script>
-		function escapeHtml(str) {return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');}
-        let stagedGateInPhotos = [];
+		function showSkymoverNotice(message, type = 'info') {
+		            let host = document.getElementById('skymoverToastHost');
+		            if (!host) {
+		                host = document.createElement('div');
+		                host.id = 'skymoverToastHost';
+		                host.className = 'fixed bottom-4 right-4 z-[10000] flex flex-col gap-2 max-w-sm pointer-events-none';
+		                document.body.appendChild(host);
+		            }
+		            const palette = {
+		                success: 'bg-emerald-950/95 border-emerald-500/60 text-emerald-200',
+		                warning: 'bg-amber-950/95 border-amber-500/60 text-amber-200',
+		                error: 'bg-rose-950/95 border-rose-500/60 text-rose-200',
+		                info: 'bg-slate-900/95 border-sky-500/60 text-sky-200'
+		            };
+		            const toast = document.createElement('div');
+		            toast.className = `pointer-events-auto border px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold transition-opacity duration-300 ${palette[type] || palette.info}`;
+		            toast.textContent = String(message ?? '');
+		            host.appendChild(toast);
+		            setTimeout(() => {
+		                toast.style.opacity = '0';
+		                setTimeout(() => toast.remove(), 300);
+		            }, 4500);
+		        }
+		function escapeHtml(val) {
+		    return String(val ?? '')
+		        .replace(/&/g, '&amp;')
+		        .replace(/</g, '&lt;')
+		        .replace(/>/g, '&gt;')
+		        .replace(/"/g, '&quot;')
+		        .replace(/'/g, '&#39;');
+		}
+
+		function escapeAttr(val) {
+		    return escapeHtml(val).replace(/`/g, '&#96;');
+		}
+
+		function resetGateInEditState() {
+		    currentEditingYardContainerIndex = null;
+		    const form = document.getElementById('yardGateInForm');
+		    if (!form) return;
+		    const submitBtn = document.getElementById('saveGateInSubmitBtn') || form.querySelector('button[type="submit"]');
+		    if (submitBtn) {
+		        submitBtn.textContent = isClientQrMode ? 'Submit Gate-In Entry' : 'Save Gate-In Entry';
+		        submitBtn.className = 'bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg font-bold';
+		    }
+		}
+		
+		let stagedGateInPhotos = [];
         let stagedGateOutPhotos = [];
         let stagedDriverAttachments = [];
         let stagedBackendAttachments = [];
@@ -1496,6 +1550,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
         function applyClientQrModeUI() {
             if (!isClientQrMode) return;
 
+			resetGateInEditState();
+			
             const loginModal = document.getElementById('loginModal');
             if (loginModal) loginModal.style.display = 'none';
 
@@ -2204,8 +2260,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
         let isSavingCloudData = false;
         let lastLocalSaveTimestamp = 0;
 
-        const SUPABASE_URL = "https://ygghxpsddnjzgnkvbrtl.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable__crUSfSiNT15j2bEtSGq8A_KnXDrnLo";
+		// Load from build-time env / window config instead of committing raw keys in source
+		const SUPABASE_URL = window.__SKYMOVER_CONFIG__?.SUPABASE_URL || "";
+		const SUPABASE_ANON_KEY = window.__SKYMOVER_CONFIG__?.SUPABASE_ANON_KEY || "";
         const STORAGE_BUCKET_NAME = "skymover-attachments";
 
         // ==========================================
@@ -2297,10 +2354,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
             return 'landing';
         }
 
-        function canRoleModifyYard() {
-            if (isClientQrMode) return true;
-            return ['admin', 'yard_manager'].includes(currentUserRole);
-        }
+		function canRoleModifyYard() {
+		    // Unauthenticated Client QR mode should not mutate yard master/revenue state directly
+		    if (isClientQrMode) return false;
+		    return ['admin', 'yard_manager'].includes(currentUserRole);
+		}
 
         function requireAdminExecution(actionLabel = "execute this operation") {
             if (currentUserRole !== 'admin') {
@@ -2455,8 +2513,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 console.warn("hub_locations standalone table fetch skipped (using unified enterprise payload):", e.message);
             }
         }
-
-        async function syncHubLocationToSupabase(hubObj) {
+	async function syncHubLocationToSupabase(hubObj) {
             if (!supabaseClient) return null;
             try {
                 const nowIso = new Date().toISOString();
@@ -3028,7 +3085,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     <div class="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs">
                         <i class="fa-solid fa-user-check text-emerald-400"></i>
                         <div class="flex flex-col">
-                            <span class="text-slate-200 font-semibold truncate max-w-[110px]">${user.email}</span>
+							<span class="text-slate-200 font-semibold truncate max-w-[110px]" title="${escapeAttr(user.email)}">${escapeHtml(user.email)}</span>
                             <span class="text-[9px] uppercase font-bold px-1 rounded border ${roleBadgeColor} w-max mt-0.5">${role.replace('_', ' ')}</span>
                         </div>
                         <button onclick="handleSupabaseSignOut(false)" class="text-rose-400 hover:text-rose-300 ml-2 font-bold" title="Sign Out">
@@ -3664,9 +3721,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-		function verifyAdminPassword(pwd) {
-		    if (!pwd || pwd !== "Skymover_Transportation_2026") {
-		        alert('⛔ Incorrect Database Reset Password.');
+		// Never store a master reset password in frontend JS; verify via Supabase Auth session + admin role / Edge Function
+		async function verifyAdminResetAuthorization() {
+		    if (!supabaseClient || !currentUser || currentUserRole !== 'admin') {
+		        alert('⛔ Only an authenticated Administrator can perform database resets.');
+		        return false;
+		    }
+		    const { data: { session }, error } = await supabaseClient.auth.getSession();
+		    if (error || !session) {
+		        alert('⛔ Session expired. Please sign in again.');
+		        return false;
+		    }
+		    const confirmation = prompt('Type RESET to confirm permanent data wipe (a backup JSON will download first):');
+		    if (confirmation !== 'RESET') {
+		        alert('Reset cancelled.');
 		        return false;
 		    }
 		    return true;
@@ -3677,8 +3745,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         async function confirmResetBackendAndDriverDB() {
             if (!requireAdminExecution("reset Management Backend & Driver's Side records")) return;
-            const pwd = prompt('🔒 Enter Database Reset Password to Reset Management Backend & Driver\'s Side Records (Empty Yard records will be preserved):');
-            if (!verifyAdminPassword(pwd)) return;
+            const authorized = await verifyAdminResetAuthorization();
+            if (!authorized) return;
 
             try {
                 const backupPayload = {
@@ -3839,8 +3907,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         async function confirmResetEmptyYardDB() {
 			if (!requireAdminExecution("reset Empty Yard records")) return;
-            const pwd = prompt('🔒 Enter Database Reset Password to Reset Empty Yard Records (Management Backend & Driver\'s Side records will be preserved):');
-            if (!verifyAdminPassword(pwd)) return;
+            const authorized = await verifyAdminResetAuthorization();
+            if (!authorized) return;
 
             try {
                 const backupPayload = {
@@ -5056,24 +5124,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }));
         }
 
-        function renderPhotoThumbnailsForReport(photoList, emptyLabel = 'No photos') {
-            if (!Array.isArray(photoList) || photoList.length === 0) {
-                return `<span class="text-slate-400 italic text-[10px]">${emptyLabel}</span>`;
-            }
-            return photoList.map(p => {
-                const src = (typeof p === 'string') ? p : (p.dataUrl || p.localPreviewUrl || p.fileUrl || p.url || '');
-                const name = (p && p.name) ? p.name : 'Attachment';
-                const isPdf = (p && p.type && p.type.includes('pdf')) || src.toLowerCase().endsWith('.pdf');
-                if (!src) return '';
-                if (isPdf) {
-                    return `<a href="${src}" target="_blank" class="text-sky-700 underline text-[10px] block font-semibold"><i class="fa-solid fa-file-pdf text-rose-600 mr-1"></i>${name}</a>`;
-                }
-                return `<a href="${src}" target="_blank" class="inline-block mr-1 mb-1">
-                    <img src="${src}" crossorigin="anonymous" class="w-14 h-14 object-cover rounded border border-slate-400 shadow-sm" title="${name}">
-                </a>`;
-            }).join('') || `<span class="text-slate-400 italic text-[10px]">${emptyLabel}</span>`;
-        }
-		// ==========================================
+		function isSafeAssetUrl(u) {
+		    if (typeof u !== 'string') return false;
+		    const s = u.trim();
+		    return s.startsWith('https://') || s.startsWith('http://') || s.startsWith('data:image/') || s.startsWith('blob:');
+		}
+		
+		function renderPhotoThumbnailsForReport(photoList, emptyLabel = 'No photos') {
+		    if (!Array.isArray(photoList) || photoList.length === 0) {
+		        return `<span class="text-slate-400 italic text-[10px]">${escapeHtml(emptyLabel)}</span>`;
+		    }
+		    const itemsHtml = photoList.map(p => {
+		        const rawSrc = (typeof p === 'string') ? p : (p?.dataUrl || p?.localPreviewUrl || p?.fileUrl || p?.url || '');
+		        if (!isSafeAssetUrl(rawSrc)) return '';
+		        const safeSrc = escapeAttr(rawSrc);
+		        const safeName = escapeAttr((p && p.name) ? p.name : 'Attachment');
+		        const isPdf = (p && p.type && String(p.type).includes('pdf')) || rawSrc.toLowerCase().split('?')[0].endsWith('.pdf');
+		        if (isPdf) {
+		            return `<a href="${safeSrc}" target="_blank" rel="noopener noreferrer" class="text-sky-700 underline text-[10px] block font-semibold"><i class="fa-solid fa-file-pdf text-rose-600 mr-1"></i>${escapeHtml(safeName)}</a>`;
+		        }
+		        return `<a href="${safeSrc}" target="_blank" rel="noopener noreferrer" class="inline-block mr-1 mb-1">
+		            <img src="${safeSrc}" crossorigin="anonymous" class="w-14 h-14 object-cover rounded border border-slate-400 shadow-sm" alt="${safeName}" title="${safeName}">
+		        </a>`;
+		    }).filter(Boolean).join('');
+		    return itemsHtml || `<span class="text-slate-400 italic text-[10px]">${escapeHtml(emptyLabel)}</span>`;
+		}
+	// ==========================================
         // FULL-DETAIL PDF & EXCEL REPORT GENERATORS (WITH ACTUAL EMBEDDED PHOTOS & UNCROPPED LAYOUT)
         // ==========================================
         async function generateModulePDFReport(moduleName) {
@@ -7300,8 +7376,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 `;
             }
         }
-
-        let scannedOrphanedFiles = [];
+	let scannedOrphanedFiles = [];
 
         async function collectAllDatabaseFileReferences() {
             const chunks = [JSON.stringify(db || {}), JSON.stringify(yardDb || {})];
@@ -7365,6 +7440,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         async function openStorageOrphanCleanerFromYard() {
             if (!requireAdminExecution("scan and clean orphaned storage files")) return;
             openSubModule('Data Backup');
+			await new Promise(resolve => setTimeout(resolve, 0));
             const resultsArea = document.getElementById('orphanScanResultsArea');
             if (resultsArea) resultsArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             await scanOrphanedStorageFiles();
@@ -7921,7 +7997,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         releasePhotos: c.release_photos || []
                     }));
 
-                    // Keep only local items that do not have a cloud ID yet (newly created offline)
                     const pendingLocalOnly = (yardDb.containers || []).filter(localItem => !localItem || !localItem.id);
                     const cloudIds = new Set(cloudContainers.map(c => String(c.id)));
                     const remainingLocal = pendingLocalOnly.filter(l => !l.id || !cloudIds.has(String(l.id)));
@@ -8086,9 +8161,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
             refreshYardDashboard();
         }
 
-        // ==========================================
-        // FEATURE ENHANCEMENT #3 & #4: ACCEPT PENDING & LOCK RELEASED CONTAINERS
-        // ==========================================
         async function acceptPendingContainerEntry(index) {
             if (!requireYardOperationExecution("accept a pending container submission")) return;
             const containers = yardDb.containers || [];
@@ -8109,12 +8181,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
         function editContainerEntry(index) {
+			if (isClientQrMode) return;
             if (!requireYardOperationExecution("edit a container inventory record")) return;
             const containers = yardDb.containers || [];
             const target = containers[index];
             if (!target) return;
 
-            // FEATURE ENHANCEMENT #4: Lock Edit for Released containers
             if (target.status === 'Released') {
                 alert('🔒 Action Locked: Released containers cannot be edited to preserve billing and audit integrity.');
                 return;
@@ -9037,9 +9109,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
             `;
         }
 
-		// ==========================================
-        // BUG FIX #2: FULL CENTERED, UNCROPPED PDF EXPORT FOR VISUAL EXTRACTION REPORT
-        // ==========================================
 		async function exportVisualExtractionPDF() {
             const filterMode = currentExtractionFilter || 'ALL';
             const exportBtn = document.getElementById('exportVisualPdfBtn');
@@ -9142,6 +9211,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
 
             document.querySelectorAll('.yard-tab').forEach(el => el.classList.add('hidden'));
+			if (tabId !== 'yardGateIn') {
+		        resetGateInEditState();
+		    }
             const target = document.getElementById(tabId);
             if(target) target.classList.remove('hidden');
 
@@ -9219,12 +9291,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 document.getElementById('dashTotalRev').innerText = '₱' + totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 });
             }
 
-            const recentBody = document.getElementById('yardRecentBody');
+			const recentBody = document.getElementById('yardRecentBody');
             if (recentBody) {
                 const recent = (yardDb.movements || []).slice(0, 100);
                 recentBody.innerHTML = recent.length ? recent.map(m => `
                     <tr class="border-b">
-                        <td class="p-3 font-mono text-[11px]">${m.date ? new Date(m.date).toLocaleString() : '—'}</td>
+                        <td class="p-3 font-mono text-[11px]">${m.date ? escapeHtml(new Date(m.date).toLocaleString()) : '—'}</td>
                         <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
                         <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
@@ -9259,54 +9331,58 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function renderYardInventory() {
+		function renderYardInventory() {
             const tbody = document.getElementById('yardInventoryRows');
-            if(!tbody) return;
-            const search = (document.getElementById('yardSearchInput') ? document.getElementById('yardSearchInput').value : '').toLowerCase();
+            if (!tbody) return;
+            const searchEl = document.getElementById('yardSearchInput');
+            const search = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').toLowerCase();
             const isAdmin = currentUserRole === 'admin';
             const canYardEdit = ['admin', 'yard_manager'].includes(currentUserRole);
 
             const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
             const containers = allContainers.filter(c => {
                 if (!search) return true;
-                return c.number.toLowerCase().includes(search) || c.line.toLowerCase().includes(search) || (c.plate && c.plate.toLowerCase().includes(search));
+                const num = String(c.number || '').toLowerCase();
+                const line = String(c.line || '').toLowerCase();
+                const plate = String(c.plate || '').toLowerCase();
+                return num.includes(search) || line.includes(search) || plate.includes(search);
             });
 
             tbody.innerHTML = containers.length ? containers.map(c => {
                 let badgeClass = 'Available';
-                if(c.status === 'Reserved') badgeClass = 'Reserved';
-                else if(c.status === 'Hold' || c.condition === 'Damaged') badgeClass = 'Hold';
-                else if(c.status === 'Pending') badgeClass = 'Pending';
-                else if(c.status === 'Released') badgeClass = 'Released';
+                if (c.status === 'Reserved') badgeClass = 'Reserved';
+                else if (c.status === 'Hold' || c.condition === 'Damaged') badgeClass = 'Hold';
+                else if (c.status === 'Pending') badgeClass = 'Pending';
+                else if (c.status === 'Released') badgeClass = 'Released';
 
                 const isReleased = c.status === 'Released';
                 const isPending = c.status === 'Pending';
 
                 let actionsHtml = '<span class="text-[10px] text-slate-400">Read Only</span>';
                 if (isReleased) {
-                    // FEATURE ENHANCEMENT #4: Hide/disable Edit and Delete for Released containers
                     actionsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><i class="fa-solid fa-lock text-[9px]"></i> Locked (Released)</span>`;
                 } else if (canYardEdit) {
+                    const idx = Number(c.originalIdx);
                     const acceptBtn = isPending
-                        ? `<button onclick="acceptPendingContainerEntry(${c.originalIdx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>`
+                        ? `<button onclick="acceptPendingContainerEntry(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>`
                         : '';
-                    const editBtn = `<button onclick="editContainerEntry(${c.originalIdx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>`;
+                    const editBtn = `<button onclick="editContainerEntry(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>`;
                     const deleteBtn = isAdmin
-                        ? `<button onclick="deleteContainerEntry(${c.originalIdx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>`
+                        ? `<button onclick="deleteContainerEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>`
                         : '';
                     actionsHtml = `${acceptBtn} ${editBtn} ${deleteBtn}`;
                 }
 
-                return `
+				return `
                     <tr class="border-b hover:bg-slate-50">
-						<td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(c.number)}</td>
-						<td class="p-3">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}</td>
-						<td class="p-3 font-bold">${escapeHtml(c.line)}</td>
-                        <td class="p-3"><span class="pill ${badgeClass}">${c.status}</span></td>
-                        <td class="p-3 font-mono text-xs">Block ${c.block || 'A'}, Bay ${c.bay || '1'} (${c.row || 'GROUND'})</td>
-                        <td class="p-3 font-mono text-[11px]">${c.date ? new Date(c.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-mono text-[11px]">${c.gateOutDate ? new Date(c.gateOutDate).toLocaleString() : 'Active'}</td>
-                        <td class="p-3 font-mono text-[11px]">In: ₱${c.vanInAmount || 0} (${c.vanInStats || 'PAID'})<br>Out: ₱${c.vanOutAmount || 0}</td>
+                        <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(c.number)}</td>
+                        <td class="p-3">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}</td>
+                        <td class="p-3 font-bold">${escapeHtml(c.line)}</td>
+                        <td class="p-3"><span class="pill ${escapeHtml(badgeClass)}">${escapeHtml(c.status)}</span></td>
+                        <td class="p-3 font-mono text-xs">Block ${escapeHtml(c.block || 'A')}, Bay ${escapeHtml(c.bay || '1')} (${escapeHtml(c.row || 'GROUND')})</td>
+                        <td class="p-3 font-mono text-[11px]">${c.date ? escapeHtml(new Date(c.date).toLocaleString()) : '—'}</td>
+                        <td class="p-3 font-mono text-[11px]">${c.gateOutDate ? escapeHtml(new Date(c.gateOutDate).toLocaleString()) : 'Active'}</td>
+                        <td class="p-3 font-mono text-[11px]">In: ₱${Number(c.vanInAmount || 0)} (${escapeHtml(c.vanInStats || 'PAID')})<br>Out: ₱${Number(c.vanOutAmount || 0)}</td>
                         <td class="p-3 text-right space-x-1">${actionsHtml}</td>
                     </tr>
                 `;
@@ -9318,7 +9394,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const target = (yardDb.containers || [])[idx];
             if (!target) return;
 
-            // FEATURE ENHANCEMENT #4: Lock Delete for Released containers
             if (target.status === 'Released') {
                 alert('🔒 Action Locked: Released containers cannot be deleted to preserve billing and audit integrity.');
                 return;
@@ -9349,9 +9424,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        // ==========================================
-        // GATE-IN HANDLER (FEATURE ENHANCEMENT #3: DIRECT SAVE TO SUPABASE FOR CLIENT & ADMIN)
-        // ==========================================
 		async function handleYardGateIn(e) {
 			e.preventDefault();
 			if (pendingUploadsCount > 0) {
@@ -9366,123 +9438,89 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const containerNo = formData.get('number').trim().toUpperCase();
 
             // CLIENT SELF-SERVICE PORTAL: DIRECT SAVE TO SUPABASE FOR IMMEDIATE YARD PERSONNEL REVIEW
-            if (isClientQrMode) {
-                const waiverAccepted = document.getElementById('gateInWaiverAccepted')?.checked || false;
-                const waiverSignature = (document.getElementById('gateInWaiverSignature')?.value || '').trim();
-                const signedAtIso = new Date().toISOString();
-
-                if (!waiverAccepted || !waiverSignature) {
-                    alert('⚠️ You must check the Mandatory Waiver agreement and enter your Electronic Signature (Full Name) before submitting.');
-                    return;
-                }
-
-                const tsField = document.getElementById('gateInWaiverTimestamp');
-                if (tsField) tsField.value = new Date(signedAtIso).toLocaleString();
-
-                if (!yardDb.containers) yardDb.containers = [];
-                const duplicateActiveIdx = yardDb.containers.findIndex(c =>
-                    (c.number || '').trim().toUpperCase() === containerNo &&
-                    c.status !== 'Released'
-                );
-                if (duplicateActiveIdx !== -1) {
-                    alert(`⚠️ Container ${containerNo} is already recorded in the yard (${yardDb.containers[duplicateActiveIdx].status}). Please contact Yard Operations if you need to update it.`);
-                    return;
-                }
-
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = 'Saving to Cloud DB...';
-                }
-
-                try {
-                    const containerData = {
-                        number: containerNo,
-                        size: formData.get('size'),
-                        type: formData.get('type') || 'Dry',
-                        line: formData.get('line'),
-                        truckingName: (formData.get('truckingName') || '').trim(),
-                        plate: (formData.get('plate') || '').trim().toUpperCase(),
-                        driver: (formData.get('driver') || '').trim(),
-                        eir: (formData.get('eir') || '').trim(),
-                        condition: formData.get('condition') || 'Good',
-                        status: 'Pending',
-                        block: formData.get('block') || 'A',
-                        bay: formData.get('bay') || 'BAY-1',
-                        row: formData.get('row') || 'GROUND',
-                        tier: formData.get('tier') || '1',
-                        date: formData.get('date'),
-                        etaDate: formData.get('etaDate'),
-                        gateInToD: formData.get('gateInToD') || 'MORNING',
-                        remarks: (formData.get('remarks') || '').trim() + (waiverSignature ? ` [Client Waiver Signed: ${waiverSignature}]` : ''),
-                        vanInAmount: 0,
-                        vanInStats: 'PENDING_REVIEW',
-                        vanOutAmount: 0,
-                        waiverSignature: waiverSignature,
-                        waiverSignedAt: signedAtIso,
-                        photos: [...stagedGateInPhotos]
-                    };
-
-                    // 1. Save directly to yard_containers in Supabase
-                    yardDb.containers.unshift(containerData);
-                    await syncYardContainerToSupabase(containerData);
-
-                    // 2. Save directly to yard_movements in Supabase
-                    const movementRecord = {
-                        date: containerData.date, etaDate: containerData.etaDate, gateInToD: containerData.gateInToD,
-                        kind: 'GATE-IN', container: containerData.number, size: containerData.size, type: containerData.type,
-                        line: containerData.line, truckingName: containerData.truckingName, plate: containerData.plate,
-                        driver: containerData.driver, eir: containerData.eir, condition: containerData.condition,
-                        status: 'Pending', block: containerData.block, bay: containerData.bay,
-                        row: containerData.row, tier: containerData.tier, vanInAmount: 0,
-                        vanInStats: 'PENDING_REVIEW', remarks: containerData.remarks,
-                        amount: 0, totalAmount: 0,
-                        photos: [...stagedGateInPhotos]
-                    };
-                    if (!yardDb.movements) yardDb.movements = [];
-                    yardDb.movements.unshift(movementRecord);
-                    await insertYardMovementToSupabase(movementRecord);
-
-                    // 3. Also log to gate_notifications audit table if present
-                    if (supabaseClient) {
-                        try {
-                            await supabaseClient.from('gate_notifications').insert([{
-                                movement_type: 'GATE_IN',
-                                container_number: containerNo,
-                                trucking_name: containerData.truckingName,
-                                truck_plate_number: containerData.plate,
-                                driver_name: containerData.driver,
-                                van_in_amount: null,
-                                van_in_status: 'PENDING_REVIEW',
-                                waiver_accepted: true,
-                                waiver_signature: waiverSignature,
-                                waiver_signed_at: signedAtIso
-                            }]);
-                        } catch (notifErr) {}
-                    }
-
-					// 4. Sync unified cloud payload & update UI immediately, then fire email in background
-                    await saveCloudData();
-                    clearGateInFormAndPhotos();
-
-                    void sendGateInEmailNotification(containerData)
-                        .then(res => {
-                            if (!res || !res.sent) {
-                                console.warn('Client Gate-In email notice:', res && res.errorDetail ? res.errorDetail : 'not sent');
-                            }
-                        })
-                        .catch(err => console.warn('Client Gate-In email error:', err));
-
-                    alert(`✅ Gate-In Entry (${containerNo}) saved directly to Database for Yard Personnel review! Electronic waiver signed by ${waiverSignature}.`);
-                } catch (err) {
-                    alert(`❌ Failed to save Gate-In entry: ${err.message || err}`);
-                } finally {
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Submit Gate-In Entry';
-                    }
-                }
-                return;
-            }
+			if (isClientQrMode) {
+			        const waiverAccepted = document.getElementById('gateInWaiverAccepted')?.checked || false;
+			        const waiverSignature = (document.getElementById('gateInWaiverSignature')?.value || '').trim();
+			        const signedAtIso = new Date().toISOString();
+			
+			        if (!waiverAccepted || !waiverSignature) {
+			            showSkymoverNotice('You must check the Mandatory Waiver agreement and enter your Electronic Signature (Full Name) before submitting.', 'warning');
+			            return;
+			        }
+			
+			        if (submitBtn) {
+			            submitBtn.disabled = true;
+			            submitBtn.textContent = 'Submitting Request...';
+			        }
+			
+			        try {
+			            const requestPayload = {
+			                movement_type: 'GATE_IN',
+			                container_number: containerNo,
+			                size: formData.get('size'),
+			                container_type: formData.get('type') || 'Dry',
+			                shipping_line: formData.get('line'),
+			                trucking_name: (formData.get('truckingName') || '').trim(),
+			                truck_plate_number: (formData.get('plate') || '').trim().toUpperCase(),
+			                driver_name: (formData.get('driver') || '').trim(),
+			                eir_ref: (formData.get('eir') || '').trim(),
+			                condition: formData.get('condition') || 'Good',
+			                block: formData.get('block') || 'A',
+			                bay: formData.get('bay') || 'BAY-1',
+			                yard_row: formData.get('row') || 'GROUND',
+			                tier: formData.get('tier') || '1',
+			                gate_in_date: formData.get('date') ? new Date(formData.get('date')).toISOString() : null,
+			                eta_date: formData.get('etaDate') ? new Date(formData.get('etaDate')).toISOString() : null,
+			                gate_in_tod: formData.get('gateInToD') || 'MORNING',
+			                remarks: (formData.get('remarks') || '').trim(),
+			                van_in_amount: null,
+			                van_in_status: 'PENDING_REVIEW',
+			                waiver_accepted: true,
+			                waiver_signature: waiverSignature,
+			                waiver_signed_at: signedAtIso
+			            };
+			
+			            if (supabaseClient) {
+			                const { error } = await supabaseClient.from('gate_notifications').insert([requestPayload]);
+			                if (error) throw error;
+			            }
+			
+			            await sendGateInEmailNotification({
+			                number: containerNo,
+			                size: requestPayload.size,
+			                type: requestPayload.container_type,
+			                line: requestPayload.shipping_line,
+			                truckingName: requestPayload.trucking_name,
+			                plate: requestPayload.truck_plate_number,
+			                driver: requestPayload.driver_name,
+			                eir: requestPayload.eir_ref,
+			                condition: requestPayload.condition,
+			                status: 'Pending Review',
+			                block: requestPayload.block,
+			                bay: requestPayload.bay,
+			                row: requestPayload.yard_row,
+			                tier: requestPayload.tier,
+			                date: formData.get('date'),
+			                etaDate: formData.get('etaDate'),
+			                gateInToD: requestPayload.gate_in_tod,
+			                waiverSignature,
+			                waiverSignedAt: signedAtIso,
+			                remarks: requestPayload.remarks,
+			                photos: [...stagedGateInPhotos]
+			            });
+			
+			            clearGateInFormAndPhotos();
+			            showSkymoverNotice(`Gate-In request (${escapeHtml(containerNo)}) submitted for Yard Personnel review.`, 'success');
+			        } catch (err) {
+			            showSkymoverNotice(`Failed to submit Gate-In request: ${escapeHtml(err.message || err)}`, 'error');
+			        } finally {
+			            if (submitBtn) {
+			                submitBtn.disabled = false;
+			                submitBtn.textContent = 'Submit Gate-In Entry';
+			            }
+			        }
+			        return;
+			    }
 
             // ADMIN / YARD MANAGER MODE: FULL INVENTORY RECORDING
             if(!yardDb.containers) yardDb.containers = [];
@@ -9667,7 +9705,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const gateOutTime = new Date(gateOutDateVal).getTime();
 
             const diffDays = Math.max(1, Math.ceil((gateOutTime - gateInTime) / (1000 * 60 * 60 * 24)));
-            const storageRate = parseFloat(document.getElementById('calcStorageAmount').value) || 450;
+            const storageRate = parseFloat(document.getElementById('calcStorageAmount').value) || 300;
             const storageTotal = diffDays * storageRate;
             const vanOutAmount = parseFloat(document.getElementById('calcVanOutAmount').value) || 0;
 
@@ -9688,9 +9726,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			document.getElementById('calcTotalAmount').value = (storageTotal + vanOutAmount + unpaidVanInToAdd).toFixed(2);
         }
 
-        // ==========================================
-        // GATE-OUT HANDLER (FEATURE ENHANCEMENT #3: DIRECT SAVE TO SUPABASE FOR CLIENT & ADMIN)
-        // ==========================================
         async function handleYardGateOut(e) {
             e.preventDefault();
 			if (pendingUploadsCount > 0) {
@@ -9704,119 +9739,64 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const submitBtn = document.getElementById('confirmGateOutSubmitBtn') || form.querySelector('button[type="submit"]');
 
             // CLIENT SELF-SERVICE PORTAL: DIRECT SAVE TO SUPABASE FOR YARD PERSONNEL REVIEW
-            if (isClientQrMode) {
-                const containerNo = (document.getElementById('yardOutContainerInput')?.value || '').trim().toUpperCase();
-                const customer = (document.getElementById('gateOutCustomer')?.value || '').trim();
-                const plate = (document.getElementById('gateOutPlate')?.value || '').trim().toUpperCase();
-                const driver = (document.getElementById('gateOutDriver')?.value || '').trim();
-                const eirRef = (document.getElementById('gateOutEir')?.value || '').trim();
-                const etaPulloutDate = document.getElementById('gateOutETADateInput')?.value || '';
-                const gateOutToD = document.getElementById('gateOutToD')?.value || 'MORNING';
-                const remarks = (document.getElementById('gateOutRemarks')?.value || '').trim();
-
-                if (!containerNo || !customer || !plate || !eirRef || !etaPulloutDate) {
-                    alert('⚠️ Please complete all required Gate-Out fields marked with *.');
-                    return;
-                }
-
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = 'Saving to Cloud DB...';
-                }
-
-                try {
-                    const nowLocalIso = new Date().toISOString().slice(0, 16);
-
-                    // 1. Update matching active container in yard_containers if present (mark Reserved for Yard Review)
-                    const existingContainer = (yardDb.containers || []).find(c =>
-                        (c.number || '').trim().toUpperCase() === containerNo && c.status !== 'Released'
-                    );
-                    if (existingContainer) {
-                        existingContainer.status = 'Reserved';
-                        existingContainer.releaseCustomer = customer;
-                        existingContainer.etaPulloutDate = etaPulloutDate;
-                        existingContainer.gateOutToD = gateOutToD;
-                        if (remarks) {
-                            existingContainer.remarks = existingContainer.remarks
-                                ? `${existingContainer.remarks} | Client Gate-Out Request: ${remarks}`
-                                : `Client Gate-Out Request: ${remarks}`;
-                        }
-                        if (stagedGateOutPhotos.length > 0) {
-                            existingContainer.releasePhotos = [...(existingContainer.releasePhotos || []), ...stagedGateOutPhotos];
-                        }
-                        await syncYardContainerToSupabase(existingContainer);
-                    }
-
-                    // 2. Save directly to yard_movements in Supabase
-                    const movementRecord = {
-                        date: nowLocalIso,
-                        etaPulloutDate: etaPulloutDate,
-                        gateOutToD: gateOutToD,
-                        kind: 'GATE-OUT',
-                        container: containerNo,
-                        customer: customer,
-                        plate: plate,
-                        driver: driver,
-                        eir: eirRef,
-                        status: 'Pending Review',
-                        storageDays: 0,
-                        vanInAmount: existingContainer ? (existingContainer.vanInAmount || 0) : 0,
-                        vanOutAmount: 0,
-                        totalAmount: 0,
-                        amount: 0,
-                        remarks: remarks || 'Client Self-Service Gate-Out Request',
-                        photos: [...stagedGateOutPhotos]
-                    };
-                    if (!yardDb.movements) yardDb.movements = [];
-                    yardDb.movements.unshift(movementRecord);
-                    await insertYardMovementToSupabase(movementRecord);
-
-                    // 3. Also log to gate_notifications audit table if present
-                    const notifPayload = {
-                        movement_type: 'GATE_OUT',
-                        container_number: containerNo,
-                        release_to_customer: customer,
-                        truck_plate_number: plate,
-                        driver_name: driver,
-                        gate_out_eir_ref: eirRef,
-                        eta_pullout_datetime: new Date(etaPulloutDate).toISOString(),
-                        gate_out_time_of_day: gateOutToD,
-                        van_in_amount: null,
-                        van_in_status: 'PENDING_REVIEW'
-                    };
-
-                    if (supabaseClient) {
-                        try {
-                            await supabaseClient.from('gate_notifications').insert([notifPayload]);
-                        } catch (notifErr) {}
-                    }
-
-                    // 4. Sync unified cloud payload & send email alert
-                    await saveCloudData();
-                    const emailResult = await sendGateOutEmailNotification({
-                        ...notifPayload,
-                        remarks,
-                        photos: [...stagedGateOutPhotos]
-                    });
-
-                    form.reset();
-                    clearGateOutPhotos();
-
-                    const emailMsg = emailResult && emailResult.sent
-                        ? `\n📧 Email alert delivered to ${emailResult.recipientEmail}.`
-                        : `\n⚠️ Record saved to Database, but email delivery failed (${emailResult ? emailResult.errorDetail || 'check recipient' : 'no email'}).`;
-
-                    alert(`✅ Gate-Out Request (${containerNo}) saved directly to Database for Yard Personnel review!${emailMsg}`);
-                } catch (err) {
-                    alert(`❌ Failed to save Gate-Out request: ${err.message || err}`);
-                } finally {
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Submit Gate-Out Request';
-                    }
-                }
-                return;
-            }
+			if (isClientQrMode) {
+			        const containerNo = (document.getElementById('yardOutContainerInput')?.value || '').trim().toUpperCase();
+			        const customer = (document.getElementById('gateOutCustomer')?.value || '').trim();
+			        const plate = (document.getElementById('gateOutPlate')?.value || '').trim().toUpperCase();
+			        const driver = (document.getElementById('gateOutDriver')?.value || '').trim();
+			        const eirRef = (document.getElementById('gateOutEir')?.value || '').trim();
+			        const etaPulloutDate = document.getElementById('gateOutETADateInput')?.value || '';
+			        const gateOutToD = document.getElementById('gateOutToD')?.value || 'MORNING';
+			        const remarks = (document.getElementById('gateOutRemarks')?.value || '').trim();
+			
+			        if (!containerNo || !customer || !plate || !eirRef || !etaPulloutDate) {
+			            showSkymoverNotice('Please complete all required Gate-Out fields marked with *.', 'warning');
+			            return;
+			        }
+			
+			        if (submitBtn) {
+			            submitBtn.disabled = true;
+			            submitBtn.textContent = 'Submitting Request...';
+			        }
+			
+			        try {
+			            const notifPayload = {
+			                movement_type: 'GATE_OUT',
+			                container_number: containerNo,
+			                release_to_customer: customer,
+			                truck_plate_number: plate,
+			                driver_name: driver,
+			                gate_out_eir_ref: eirRef,
+			                eta_pullout_datetime: new Date(etaPulloutDate).toISOString(),
+			                gate_out_time_of_day: gateOutToD,
+			                van_in_amount: null,
+			                van_in_status: 'PENDING_REVIEW'
+			            };
+			
+			            if (supabaseClient) {
+			                const { error } = await supabaseClient.from('gate_notifications').insert([notifPayload]);
+			                if (error) throw error;
+			            }
+			
+			            await sendGateOutEmailNotification({
+			                ...notifPayload,
+			                remarks,
+			                photos: [...stagedGateOutPhotos]
+			            });
+			
+			            form.reset();
+			            clearGateOutPhotos();
+			            showSkymoverNotice(`Gate-Out request (${escapeHtml(containerNo)}) submitted for Yard Personnel review.`, 'success');
+			        } catch (err) {
+			            showSkymoverNotice(`Failed to submit Gate-Out request: ${escapeHtml(err.message || err)}`, 'error');
+			        } finally {
+			            if (submitBtn) {
+			                submitBtn.disabled = false;
+			                submitBtn.textContent = 'Submit Gate-Out Request';
+			            }
+			        }
+			        return;
+			    }
 
             // ADMIN / YARD MANAGER MODE: FULL CONTAINER RELEASE & BILLING
             const containerNo = document.getElementById('yardOutContainer').value;
@@ -9832,7 +9812,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const gateOutToD = formData.get('gateOutToD') || 'MORNING';
             const customer = formData.get('customer') || '';
             const storageFeeType = formData.get('fee') || 'Dry Van';
-            const storageRate = parseFloat(formData.get('storageamount')) || 450;
+            const storageRate = parseFloat(formData.get('storageamount')) || 300;
             const vanOutAmount = parseFloat(formData.get('vanOutAmount')) || 0;
             const totalAmount = parseFloat(formData.get('totalAmount')) || 0;
             const storageDays = parseInt(formData.get('storageDays')) || 1;
@@ -9903,30 +9883,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
             alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
         }
 
-        function renderYardRevenue() {
+		function renderYardRevenue() {
             const tbody = document.getElementById('revenueTableBody');
-            if(!tbody) return;
-            const dateFrom = document.getElementById('filterDateFrom').value;
-            const dateTo = document.getElementById('filterDateTo').value;
+            if (!tbody) return;
+            const dateFromEl = document.getElementById('filterDateFrom');
+            const dateToEl = document.getElementById('filterDateTo');
+            const dateFrom = dateFromEl ? dateFromEl.value : '';
+            const dateTo = dateToEl ? dateToEl.value : '';
             const isAdmin = currentUserRole === 'admin';
 
             let revs = (yardDb.revenues || []).map((r, idx) => ({ ...r, originalIdx: idx }));
-            if(dateFrom) revs = revs.filter(r => r.date && r.date.substring(0, 10) >= dateFrom);
-            if(dateTo) revs = revs.filter(r => r.date && r.date.substring(0, 10) <= dateTo);
+            if (dateFrom) revs = revs.filter(r => r.date && r.date.substring(0, 10) >= dateFrom);
+            if (dateTo) revs = revs.filter(r => r.date && r.date.substring(0, 10) <= dateTo);
 
             let totalRev = 0;
             tbody.innerHTML = revs.length ? revs.map(r => {
                 totalRev += Number(r.amount || 0);
                 return `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono text-[11px]">${r.date ? new Date(r.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-semibold">${r.source}</td>
-                        <td class="p-3 font-mono font-bold">${r.container}</td>
-                        <td class="p-3 font-mono">${r.eir}</td>
+                        <td class="p-3 font-mono text-[11px]">${r.date ? escapeHtml(new Date(r.date).toLocaleString()) : '—'}</td>
+                        <td class="p-3 font-semibold">${escapeHtml(r.source)}</td>
+                        <td class="p-3 font-mono font-bold">${escapeHtml(r.container)}</td>
+                        <td class="p-3 font-mono">${escapeHtml(r.eir)}</td>
                         <td class="p-3 text-right font-extrabold text-emerald-700">₱${Number(r.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="editYardRevenueEntry(${r.originalIdx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteYardRevenueEntry(${r.originalIdx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
+                            ${isAdmin ? `<button onclick="editYardRevenueEntry(${Number(r.originalIdx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteYardRevenueEntry(${Number(r.originalIdx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
                         </td>
                     </tr>
                 `;
@@ -9950,8 +9932,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
         function clearDateFilter() {
-            document.getElementById('filterDateFrom').value = '';
-            document.getElementById('filterDateTo').value = '';
+			const fromEl = document.getElementById('filterDateFrom');
+		    const toEl = document.getElementById('filterDateTo');
+		    if (fromEl) fromEl.value = '';
+		    if (toEl) toEl.value = '';
             renderYardRevenue();
         }
 
@@ -10016,32 +10000,47 @@ Skymover Transport is not liable for charges incurred due to operational constra
             document.body.removeChild(link);
         }
 
-        function populateMonthlyStatementSelect() {
+		function populateMonthlyStatementSelect() {
             const select = document.getElementById('statementMonthSelect');
             const tbody = document.getElementById('monthlyFinancialBody');
-            if(!select || !tbody) return;
+            if (!select || !tbody) return;
             let monthlyMap = {};
-            (yardDb.revenues || []).forEach(r => { if(!r.date) return; const mKey = r.date.substring(0, 7); if(!monthlyMap[mKey]) monthlyMap[mKey] = { rev: 0, exp: 0 }; monthlyMap[mKey].rev += Number(r.amount || 0); });
-            (yardDb.expenses || []).forEach(ex => { if(!ex.date) return; const mKey = ex.date.substring(0, 7); if(!monthlyMap[mKey]) monthlyMap[mKey] = { rev: 0, exp: 0 }; monthlyMap[mKey].exp += Number(ex.amount || 0); });
+            (yardDb.revenues || []).forEach(r => {
+                if(!r.date) return;
+                const mKey = String(r.date).substring(0, 7);
+                if(!monthlyMap[mKey]) monthlyMap[mKey] = { rev: 0, exp: 0 };
+                monthlyMap[mKey].rev += Number(r.amount || 0);
+            });
+            (yardDb.expenses || []).forEach(ex => {
+                if(!ex.date) return;
+                const mKey = String(ex.date).substring(0, 7);
+                if(!monthlyMap[mKey]) monthlyMap[mKey] = { rev: 0, exp: 0 };
+                monthlyMap[mKey].exp += Number(ex.amount || 0);
+            });
 
             const sortedMonths = Object.keys(monthlyMap).sort().reverse();
-            select.innerHTML = sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.innerHTML = sortedMonths.map(m => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join('');
             tbody.innerHTML = sortedMonths.length ? sortedMonths.map(m => {
                 const rev = monthlyMap[m].rev, exp = monthlyMap[m].exp, net = rev - exp;
-                return `<tr class="border-b"><td class="p-3 font-bold font-mono">${m}</td><td class="p-3 text-right text-emerald-700 font-bold">₱${rev.toLocaleString('en-US', {minimumFractionDigits: 2})}</td><td class="p-3 text-right text-rose-700 font-bold">₱${exp.toLocaleString('en-US', {minimumFractionDigits: 2})}</td><td class="p-3 text-right font-extrabold ${net >= 0 ? 'text-blue-800' : 'text-rose-600'}">₱${net.toLocaleString('en-US', {minimumFractionDigits: 2})}</td></tr>`;
+                return `<tr class="border-b"><td class="p-3 font-bold font-mono">${escapeHtml(m)}</td><td class="p-3 text-right text-emerald-700 font-bold">₱${rev.toLocaleString('en-US', {minimumFractionDigits: 2})}</td><td class="p-3 text-right text-rose-700 font-bold">₱${exp.toLocaleString('en-US', {minimumFractionDigits: 2})}</td><td class="p-3 text-right font-extrabold ${net >= 0 ? 'text-blue-800' : 'text-rose-600'}">₱${net.toLocaleString('en-US', {minimumFractionDigits: 2})}</td></tr>`;
             }).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500">No monthly financial records available.</td></tr>';
         }
 
 		function downloadMonthlyStatementPDF() {
-            const selectedMonth = document.getElementById('statementMonthSelect').value;
+            const monthSelect = document.getElementById('statementMonthSelect');
+            const selectedMonth = monthSelect ? monthSelect.value : '';
             if (!selectedMonth) {
                 alert('Please select a month to download.');
                 return;
             }
+            if (typeof html2pdf === 'undefined') {
+                alert('PDF generator library is not available. Check your connection and reload.');
+                return;
+            }
 
             let monthlyRev = 0, monthlyExp = 0;
-            const revList = (yardDb.revenues || []).filter(r => r.date && r.date.startsWith(selectedMonth));
-            const expList = (yardDb.expenses || []).filter(ex => ex.date && ex.date.startsWith(selectedMonth));
+            const revList = (yardDb.revenues || []).filter(r => r.date && String(r.date).startsWith(selectedMonth));
+            const expList = (yardDb.expenses || []).filter(ex => ex.date && String(ex.date).startsWith(selectedMonth));
             revList.forEach(r => { monthlyRev += Number(r.amount || 0); });
             expList.forEach(ex => { monthlyExp += Number(ex.amount || 0); });
             const netIncome = monthlyRev - monthlyExp;
@@ -10189,30 +10188,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
             renderYardRevenue();
         }
 
-        function renderYardExpenses() {
+		function renderYardExpenses() {
             const tbody = document.getElementById('expenseTableBody');
-            if(!tbody) return;
+            if (!tbody) return;
             const expenses = yardDb.expenses || [];
             const isAdmin = currentUserRole === 'admin';
             let totalExp = 0;
 
             tbody.innerHTML = expenses.length ? expenses.map((ex, idx) => {
                 totalExp += Number(ex.amount || 0);
+                const safeIdx = Number(idx);
                 return `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono text-[11px]">${ex.date ? new Date(ex.date).toLocaleString() : '—'}</td>
-                        <td class="p-3 font-bold text-slate-800">${ex.category}</td>
-                        <td class="p-3">${ex.description}</td>
+                        <td class="p-3 font-mono text-[11px]">${ex.date ? escapeHtml(new Date(ex.date).toLocaleString()) : '—'}</td>
+                        <td class="p-3 font-bold text-slate-800">${escapeHtml(ex.category)}</td>
+                        <td class="p-3">${escapeHtml(ex.description)}</td>
                         <td class="p-3 text-right font-extrabold text-rose-700">₱${Number(ex.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="editYardExpenseEntry(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteYardExpenseEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
+                            ${isAdmin ? `<button onclick="editYardExpenseEntry(${safeIdx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteYardExpenseEntry(${safeIdx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}
                         </td>
                     </tr>
                 `;
             }).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No expense records logged.</td></tr>';
 
-            if(document.getElementById('totalExpenseDisplay')) document.getElementById('totalExpenseDisplay').innerText = '₱' + totalExp.toLocaleString('en-US', {minimumFractionDigits: 2});
+            const totalExpEl = document.getElementById('totalExpenseDisplay');
+            if (totalExpEl) totalExpEl.innerText = '₱' + totalExp.toLocaleString('en-US', {minimumFractionDigits: 2});
         }
 
 		function renderYardReports() {
@@ -10243,28 +10244,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 else if (c.status === 'Hold' || c.condition === 'Damaged') linesMap[c.line].dam++;
             });
 
-            document.getElementById('yardRptGateIn').innerText = giCount;
-            document.getElementById('yardRptGateOut').innerText = goCount;
-            document.getElementById('yardRptLines').innerText = Object.keys(linesMap).length;
-            document.getElementById('yardRptMoves').innerText = movesCount;
+			const rptGateInEl = document.getElementById('yardRptGateIn');
+            const rptGateOutEl = document.getElementById('yardRptGateOut');
+            const rptLinesEl = document.getElementById('yardRptLines');
+            const rptMovesEl = document.getElementById('yardRptMoves');
 
-		const lineRows = document.getElementById('yardLineRows');
-            if(lineRows) {
+            if (rptGateInEl) rptGateInEl.innerText = giCount;
+            if (rptGateOutEl) rptGateOutEl.innerText = goCount;
+            if (rptLinesEl) rptLinesEl.innerText = Object.keys(linesMap).length;
+            if (rptMovesEl) rptMovesEl.innerText = movesCount;
+
+            const lineRows = document.getElementById('yardLineRows');
+            if (lineRows) {
                 lineRows.innerHTML = Object.keys(linesMap).length ? Object.keys(linesMap).map(l => `
                     <tr class="border-b"><td class="p-3 font-bold text-slate-900">${escapeHtml(l)}</td><td class="p-3 font-mono">${linesMap[l].total}</td><td class="p-3 font-mono text-emerald-700 font-bold">${linesMap[l].avail}</td><td class="p-3 font-mono text-amber-700 font-bold">${linesMap[l].res}</td><td class="p-3 font-mono text-rose-700 font-bold">${linesMap[l].dam}</td></tr>
                 `).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No shipping line inventory data.</td></tr>';
             }
 
             const movementRows = document.getElementById('yardMovementRows');
-            if(movementRows) {
-                const movements = yardDb.movements || [];
+            if (movementRows) {
                 movementRows.innerHTML = movements.length ? movements.map((m, idx) => `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono text-[11px]">${m.date ? new Date(m.date).toLocaleString() : '—'}</td>
+                        <td class="p-3 font-mono text-[11px]">${m.date ? escapeHtml(new Date(m.date).toLocaleString()) : '—'}</td>
                         <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
                         <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
-                        <td class="p-3 font-mono">${escapeHtml(m.storageDays || '—')}</td>
+                        <td class="p-3 font-mono">${m.storageDays !== undefined && m.storageDays !== null && m.storageDays !== '' ? escapeHtml(m.storageDays) : '—'}</td>
                         <td class="p-3 font-mono">₱${Number(m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 font-extrabold text-emerald-700">₱${Number(m.totalAmount || m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
@@ -10332,16 +10337,54 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 fileReader.onload = async function(e) {
                     try {
                         const parsed = JSON.parse(e.target.result);
-                        if(parsed.managementBackend) db = parsed.managementBackend;
-                        if(parsed.emptyYard) yardDb = parsed.emptyYard;
-                        if(!Array.isArray(db.hubLocations)) db.hubLocations = [];
-                        if(!Array.isArray(db.reportTemplates)) db.reportTemplates = [];
+						if (!parsed || typeof parsed !== 'object') {
+                            throw new Error('Invalid backup file structure.');
+                        }
+
+                        if (parsed.managementBackend && typeof parsed.managementBackend === 'object') {
+                            const mb = parsed.managementBackend;
+                            db = {
+                                ...db,
+                                vehicles: Array.isArray(mb.vehicles) ? mb.vehicles : [],
+                                drivers: Array.isArray(mb.drivers) ? mb.drivers : [],
+                                fuelLogs: Array.isArray(mb.fuelLogs) ? mb.fuelLogs : [],
+                                maintenanceLogs: Array.isArray(mb.maintenanceLogs) ? mb.maintenanceLogs : [],
+                                dispatchLogs: Array.isArray(mb.dispatchLogs) ? mb.dispatchLogs : [],
+                                expenseLogs: Array.isArray(mb.expenseLogs) ? mb.expenseLogs : [],
+                                transshipments: Array.isArray(mb.transshipments) ? mb.transshipments : [],
+                                uploads: Array.isArray(mb.uploads) ? mb.uploads : [],
+                                smsLogs: Array.isArray(mb.smsLogs) ? mb.smsLogs : [],
+                                geofenceAlerts: Array.isArray(mb.geofenceAlerts) ? mb.geofenceAlerts : [],
+                                geofenceZones: Array.isArray(mb.geofenceZones) ? mb.geofenceZones : [],
+                                hubLocations: Array.isArray(mb.hubLocations) ? mb.hubLocations : [],
+                                reportTemplates: Array.isArray(mb.reportTemplates) ? mb.reportTemplates : [],
+                                systemUsers: Array.isArray(mb.systemUsers) ? mb.systemUsers : db.systemUsers
+                            };
+                        }
+
+                        if (parsed.emptyYard && typeof parsed.emptyYard === 'object') {
+                            const ey = parsed.emptyYard;
+                            yardDb = {
+                                containers: Array.isArray(ey.containers) ? ey.containers : [],
+                                movements: Array.isArray(ey.movements) ? ey.movements : [],
+                                revenues: Array.isArray(ey.revenues) ? ey.revenues : [],
+                                expenses: Array.isArray(ey.expenses) ? ey.expenses : []
+                            };
+                        }
+
+                        deduplicateAllCollections();
                         await saveCloudData();
-                        alert('✅ Unified enterprise backup successfully restored and synced to cloud database!');
+                        refreshHubDatalist();
                         refreshYard();
+                        renderYardRevenue();
+                        renderYardExpenses();
+                        renderYardReports();
+                        populateYardOutContainerDropdown();
+                        renderTransshipmentTable();
+                        showSkymoverNotice('Unified enterprise backup successfully restored and synced.', 'success');
                     } catch(err) {
-                        alert('❌ Error parsing backup file: ' + err.message);
-                    }
+						showSkymoverNotice(`Error parsing backup file: ${escapeHtml(err.message || err)}`, 'error');
+					}
                 }
             }
         }
@@ -10353,9 +10396,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const canApprove = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
             tbody.innerHTML = items.length ? items.map((t, idx) => `
                 <tr class="border-b border-slate-800">
-                    <td class="p-3 font-mono font-bold text-sky-400">${t.id}</td>
-                    <td class="p-3">${t.origin}</td>
-                    <td class="p-3 font-mono">${t.container}</td>
+					<td class="p-3 font-mono font-bold text-sky-400">${escapeHtml(t.id)}</td>
+					<td class="p-3">${escapeHtml(t.origin)}</td>
+					<td class="p-3 font-mono">${escapeHtml(t.container)}</td>
                     <td class="p-3 font-bold text-emerald-400">₱${Number(t.commission || 0).toLocaleString()}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.status.includes('Accepted') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">${t.status}</span></td>
                     <td class="p-3 text-right">
@@ -10415,4 +10458,3 @@ Skymover Transport is not liable for charges incurred due to operational constra
     </script>
 </body>
 </html>
-
