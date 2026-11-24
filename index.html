@@ -1272,6 +1272,51 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
     <!-- JAVASCRIPT LOGIC WITH SUPABASE AUTHENTICATION, REAL-TIME WEBSOCKET SYNC, RBAC & CLIENT QR ACCESS -->
     <script>
+		function showSkymoverConfirm(message, { title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel', danger = false } = {}) {
+            return new Promise((resolve) => {
+                let overlay = document.getElementById('skymoverConfirmOverlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'skymoverConfirmOverlay';
+                    overlay.className = 'fixed inset-0 modal-glass z-[10001] hidden flex items-center justify-center p-4';
+                    overlay.innerHTML = `
+                        <div class="glass-card w-full max-w-md rounded-2xl p-6 border border-slate-700 shadow-2xl space-y-4 text-white">
+                            <h3 id="skymoverConfirmTitle" class="text-base font-bold"></h3>
+                            <p id="skymoverConfirmMessage" class="text-xs text-slate-300 leading-relaxed whitespace-pre-line"></p>
+                            <div class="flex justify-end gap-2 pt-2">
+                                <button type="button" id="skymoverConfirmCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Cancel</button>
+                                <button type="button" id="skymoverConfirmOk" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-xs font-bold">Confirm</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                }
+
+                const titleEl = document.getElementById('skymoverConfirmTitle');
+                const msgEl = document.getElementById('skymoverConfirmMessage');
+                const okBtn = document.getElementById('skymoverConfirmOk');
+                const cancelBtn = document.getElementById('skymoverConfirmCancel');
+
+                titleEl.textContent = title;
+                msgEl.textContent = String(message ?? '');
+                cancelBtn.textContent = cancelText;
+                okBtn.textContent = confirmText;
+                okBtn.className = danger
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-xs font-bold'
+                    : 'bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-xs font-bold';
+
+                const cleanup = (result) => {
+                    overlay.classList.add('hidden');
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    resolve(result);
+                };
+
+                okBtn.onclick = () => cleanup(true);
+                cancelBtn.onclick = () => cleanup(false);
+                overlay.classList.remove('hidden');
+            });
+        }
 		function showSkymoverNotice(message, type = 'info') {
 		            let host = document.getElementById('skymoverToastHost');
 		            if (!host) {
@@ -2356,6 +2401,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
             return 'landing';
         }
 
+		function resolveUserRoleFromAuthUser(user) {
+            if (!user) return 'guest';
+            const appRole = (user.app_metadata && typeof user.app_metadata.role === 'string')
+                ? user.app_metadata.role.trim()
+                : '';
+            const metaRole = (user.user_metadata && typeof user.user_metadata.role === 'string')
+                ? user.user_metadata.role.trim()
+                : '';
+            return appRole || metaRole || 'guest';
+        }
+		
 		function canRoleModifyYard() {
 		    // Unauthenticated Client QR mode should not mutate yard master/revenue state directly
 		    if (isClientQrMode) return false;
@@ -2983,7 +3039,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             );
         }
 
-        function initSupabase() {
+		function initSupabase() {
             try {
                 isClientQrMode = detectClientQrMode();
                 initSkymoverAlertSystem();
@@ -2994,15 +3050,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 if (isClientQrMode) {
                     applyClientQrModeUI();
-                    fetchCloudData();
                     subscribeToRealtimeChanges();
                     return;
                 }
 
                 checkActiveAuthSession();
-                fetchCloudData();
-                subscribeToRealtimeChanges();
-            } catch(e) {
+            } catch (e) {
                 updateSyncBadge('error', 'Cloud Connection Failed');
                 if (isClientQrMode) {
                     applyClientQrModeUI();
@@ -3013,18 +3066,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         // SESSION RESTORATION ON PAGE REFRESH + INACTIVITY CHECK
         // ==========================================
-        async function checkActiveAuthSession() {
+		async function checkActiveAuthSession() {
             if (isClientQrMode) {
                 applyClientQrModeUI();
                 return;
             }
-            if(!supabaseClient) {
+            if (!supabaseClient) {
                 window.openSkymoverLogin();
                 return;
             }
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
-                if(session && session.user) {
+                if (session && session.user) {
                     if (isSessionExpiredByInactivity()) {
                         await handleSupabaseSignOut(true);
                         return;
@@ -3032,7 +3085,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                     currentUser = session.user;
                     currentUserEmail = currentUser.email || '';
-					currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
+					currentUserRole = resolveUserRoleFromAuthUser(currentUser);
 
                     const loginModal = document.getElementById('loginModal');
                     if (loginModal) loginModal.style.display = 'none';
@@ -3040,6 +3093,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     updateAuthUI(currentUser, currentUserRole);
                     applyRbacPermissions(currentUserRole, true);
                     resetInactivityTimer();
+
+                    await fetchCloudData();
+                    subscribeToRealtimeChanges();
                 } else {
                     currentUser = null;
                     currentUserEmail = '';
@@ -3048,29 +3104,33 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     applyRbacPermissions('guest', false);
                     window.openSkymoverLogin();
                 }
-                supabaseClient.auth.onAuthStateChange((event, session) => {
-                    if (isClientQrMode) return;
-                    if (event === 'SIGNED_OUT') {
-                        currentUser = null;
-                        currentUserEmail = '';
-                        currentUserRole = 'guest';
-                        updateAuthUI(null, 'guest');
-                        applyRbacPermissions('guest', false);
-                        window.openSkymoverLogin();
-                        return;
-                    }
-                    if (session && session.user) {
-                        currentUser = session.user;
-                        currentUserEmail = currentUser.email || '';
-						currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
-                        updateAuthUI(currentUser, currentUserRole);
-                        resetInactivityTimer();
-                    }
-                    if (event === 'TOKEN_REFRESHED') {
-                        subscribeToRealtimeChanges();
-                    }
-                });
-            } catch(err) {
+
+                if (!window.__skymoverAuthListenerAttached) {
+                    window.__skymoverAuthListenerAttached = true;
+                    supabaseClient.auth.onAuthStateChange(async (event, authSession) => {
+                        if (isClientQrMode) return;
+                        if (event === 'SIGNED_OUT') {
+                            currentUser = null;
+                            currentUserEmail = '';
+                            currentUserRole = 'guest';
+                            updateAuthUI(null, 'guest');
+                            applyRbacPermissions('guest', false);
+                            window.openSkymoverLogin();
+                            return;
+                        }
+                        if (authSession && authSession.user) {
+                            currentUser = authSession.user;
+                            currentUserEmail = currentUser.email || '';
+							currentUserRole = resolveUserRoleFromAuthUser(currentUser);
+                            updateAuthUI(currentUser, currentUserRole);
+                            resetInactivityTimer();
+                            if (event === 'TOKEN_REFRESHED') {
+                                subscribeToRealtimeChanges();
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
                 currentUser = null;
                 currentUserEmail = '';
                 applyRbacPermissions('guest', false);
@@ -3230,7 +3290,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 					} else if(data && data.user) {
                     currentUser = data.user;
                     currentUserEmail = currentUser.email || '';
-                    currentUserRole = (currentUser.user_metadata && currentUser.user_metadata.role) ? currentUser.user_metadata.role : 'guest';
+					currentUserRole = resolveUserRoleFromAuthUser(currentUser);
 
                     localStorage.removeItem('skymover_active_view');
                     localStorage.removeItem('skymover_active_yard_tab');
@@ -3251,6 +3311,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     closeSkymoverLogin();
                     applyRbacPermissions(currentUserRole, false);
                     resetInactivityTimer();
+					subscribeToRealtimeChanges();
                 }
             } catch(err) {
                 alert('Sign in failed: ' + err.message);
@@ -4058,17 +4119,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
             renderConfiguredZones();
         }
 
-        function renderConfiguredZones() {
+		function renderConfiguredZones() {
             const container = document.getElementById('configuredZonesList');
             if(!container) return;
             const zones = db.geofenceZones || [];
             container.innerHTML = zones.length ? zones.map((z, i) => `
                 <div class="bg-slate-950 p-2 rounded border border-slate-800 flex justify-between items-center">
                     <div>
-                        <strong class="text-sky-400">${z.name}</strong>
-                        <div class="text-[10px] text-slate-500">Lat: ${z.lat}, Lng: ${z.lng} • Radius: ${z.radius}km</div>
+                        <strong class="text-sky-400">${escapeHtml(z.name)}</strong>
+                        <div class="text-[10px] text-slate-500">Lat: ${escapeHtml(z.lat)}, Lng: ${escapeHtml(z.lng)} • Radius: ${escapeHtml(z.radius)}km</div>
                     </div>
-                    <button onclick="removeGeofenceZone(${i})" class="text-rose-400 hover:text-rose-300 px-1.5"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="removeGeofenceZone(${Number(i)})" class="text-rose-400 hover:text-rose-300 px-1.5"><i class="fa-solid fa-trash"></i></button>
                 </div>
             `).join('') : '<div class="text-slate-500 italic">No custom zones configured.</div>';
         }
@@ -4833,7 +4894,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function renderDriverGeofenceAlerts() {
+		function renderDriverGeofenceAlerts() {
             const listEl =
                 document.getElementById('driverGeofenceAlertsList') ||
                 document.getElementById('driverRecentAlertsList');
@@ -4852,7 +4913,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             });
 
             if (alerts.length === 0) {
-                listEl.innerHTML = `<div class="p-3 text-center text-xs text-slate-400 bg-slate-900/60 border border-slate-800 rounded-xl">No GPS geofence alerts recorded for Unit ${identity.unit_id} yet.</div>`;
+                listEl.innerHTML = `<div class="p-3 text-center text-xs text-slate-400 bg-slate-900/60 border border-slate-800 rounded-xl">No GPS geofence alerts recorded for Unit ${escapeHtml(identity.unit_id)} yet.</div>`;
                 return;
             }
 
@@ -4862,16 +4923,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 return `
                     <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-1">
                         <div class="flex justify-between items-center gap-2">
-                            <span class="text-xs font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${a.type || a.alert_type || 'Geofence Alert'}</span>
-                            <span class="text-[10px] font-mono text-slate-400">${timeStr}</span>
+                            <span class="text-xs font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ${escapeHtml(a.type || a.alert_type || 'Geofence Alert')}</span>
+                            <span class="text-[10px] font-mono text-slate-400">${escapeHtml(timeStr)}</span>
                         </div>
-                        <p class="text-xs text-slate-200">${a.message || ''}</p>
+                        <p class="text-xs text-slate-200">${escapeHtml(a.message || '')}</p>
                     </div>
                 `;
             }).join('');
         }
 
-        function refreshDriverSmsInbox() {
+		function refreshDriverSmsInbox() {
             const container =
                 document.getElementById('driverSmsInboxList') ||
                 document.getElementById('driverSmsInbox') ||
@@ -4891,7 +4952,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 visibleLogs = [...allLogs];
                 scopeBannerHtml = `
                     <div class="flex items-center justify-between bg-sky-950/60 border border-sky-800/60 rounded-lg px-3 py-1.5 mb-2.5 text-[11px] text-sky-200">
-                        <span><i class="fa-solid fa-shield-halved text-sky-400 mr-1.5"></i> <strong>${currentUserRole === 'admin' ? 'Admin' : 'Dispatcher'} View:</strong> Showing all fleet SMS notifications (${visibleLogs.length})</span>
+                        <span><i class="fa-solid fa-shield-halved text-sky-400 mr-1.5"></i> <strong>${escapeHtml(currentUserRole === 'admin' ? 'Admin' : 'Dispatcher')} View:</strong> Showing all fleet SMS notifications (${Number(visibleLogs.length)})</span>
                     </div>
                 `;
             } else {
@@ -4924,8 +4985,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 scopeBannerHtml = `
                     <div class="flex flex-wrap items-center justify-between gap-2 bg-emerald-950/50 border border-emerald-800/60 rounded-lg px-3 py-1.5 mb-2.5 text-[11px] text-emerald-200">
-                        <span><i class="fa-solid fa-user-check text-emerald-400 mr-1.5"></i> Filtered for <strong>${identitySummary}</strong></span>
-                        <span class="font-mono text-[10px] text-emerald-300">${visibleLogs.length} message(s)</span>
+                        <span><i class="fa-solid fa-user-check text-emerald-400 mr-1.5"></i> Filtered for <strong>${escapeHtml(identitySummary)}</strong></span>
+                        <span class="font-mono text-[10px] text-emerald-300">${Number(visibleLogs.length)} message(s)</span>
                     </div>
                 `;
             }
@@ -4950,27 +5011,28 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const rawTime = sms.timestamp || sms.sent_at || sms.time || sms.created_at;
                 const timeLabel = rawTime ? new Date(rawTime).toLocaleString() : 'Just now';
                 const recipientLabel = sms.recipient || sms.driver || sms.driver_name || 'Driver';
-                const unitBadge = sms.unit || sms.unit_id
-                    ? `<span class="px-2 py-0.5 rounded bg-sky-900/70 border border-sky-700/60 text-sky-200 font-mono text-[10px] font-bold">Unit ${sms.unit || sms.unit_id}</span>`
+                const unitVal = sms.unit || sms.unit_id;
+                const unitBadge = unitVal
+                    ? `<span class="px-2 py-0.5 rounded bg-sky-900/70 border border-sky-700/60 text-sky-200 font-mono text-[10px] font-bold">Unit ${escapeHtml(unitVal)}</span>`
                     : '';
                 const hubBadge = sms.destinationHub
-                    ? `<span class="px-2 py-0.5 rounded bg-emerald-900/60 border border-emerald-700/60 text-emerald-200 text-[10px] font-semibold"><i class="fa-solid fa-location-dot mr-1"></i>${sms.destinationHub}</span>`
+                    ? `<span class="px-2 py-0.5 rounded bg-emerald-900/60 border border-emerald-700/60 text-emerald-200 text-[10px] font-semibold"><i class="fa-solid fa-location-dot mr-1"></i>${escapeHtml(sms.destinationHub)}</span>`
                     : '';
 
                 return `
                     <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-1.5 hover:border-sky-600/60 transition">
                         <div class="flex flex-wrap justify-between items-center gap-2">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="text-xs font-bold text-white"><i class="fa-solid fa-comment-sms text-emerald-400 mr-1"></i> ${recipientLabel}</span>
+                                <span class="text-xs font-bold text-white"><i class="fa-solid fa-comment-sms text-emerald-400 mr-1"></i> ${escapeHtml(recipientLabel)}</span>
                                 ${unitBadge}
                                 ${hubBadge}
                             </div>
-                            <span class="text-[10px] font-mono text-slate-400">${timeLabel}</span>
+                            <span class="text-[10px] font-mono text-slate-400">${escapeHtml(timeLabel)}</span>
                         </div>
-                        <p class="text-xs text-slate-200 leading-relaxed">${sms.message || ''}</p>
+                        <p class="text-xs text-slate-200 leading-relaxed">${escapeHtml(sms.message || '')}</p>
                         <div class="flex justify-between items-center text-[10px] text-slate-400 pt-0.5">
-                            <span>To: <span class="font-mono text-slate-300">${sms.phone || 'In-App Driver Inbox'}</span></span>
-                            <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check-double mr-0.5"></i> ${sms.status || 'Delivered'}</span>
+                            <span>To: <span class="font-mono text-slate-300">${escapeHtml(sms.phone || 'In-App Driver Inbox')}</span></span>
+                            <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check-double mr-0.5"></i> ${escapeHtml(sms.status || 'Delivered')}</span>
                         </div>
                     </div>
                 `;
@@ -4979,14 +5041,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
             container.innerHTML = `${scopeBannerHtml}<div class="space-y-2.5">${cardsHtml}</div>`;
         }
 
-        function renderGeofenceLogs(containerEl) {
-            const alerts = db.geofenceAlerts || [];
-            containerEl.innerHTML = alerts.length ? alerts.map(a => `
-                <div class="bg-slate-950 p-2.5 rounded border border-slate-800 text-xs font-mono text-emerald-400 mb-2">
-                    <i class="fa-solid fa-satellite-dish mr-1"></i> ${a.message}
-                </div>
-            `).join('') : '<div class="text-slate-500 italic text-xs">No active geofence boundary alerts.</div>';
-        }
+		function renderGeofenceLogs(containerEl) {
+		    if (!containerEl) return;
+		    const alerts = db.geofenceAlerts || [];
+		    containerEl.innerHTML = alerts.length ? alerts.map(a => `
+		        <div class="bg-slate-950 p-2.5 rounded border border-slate-800 text-xs font-mono text-emerald-400 mb-2">
+		            <i class="fa-solid fa-satellite-dish mr-1"></i> ${escapeHtml(a.message)}
+		        </div>
+		    `).join('') : '<div class="text-slate-500 italic text-xs">No active geofence boundary alerts.</div>';
+		}
 
         function handleDragOver(e, zoneId) {
             e.preventDefault();
@@ -5984,7 +6047,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        async function loadAuditLogsModal() {
+		async function loadAuditLogsModal() {
             if (!requireAdminExecution("view or manage the System Audit Trail")) return;
             if (!supabaseClient) return;
 
@@ -6004,15 +6067,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if (!modal || !content) return;
             modal.classList.remove('hidden');
 
-            const rows = logs && logs.length ? logs.map(l => `
+            const rows = logs && logs.length ? logs.map(l => {
+                const payloadJson = l.new_data ? JSON.stringify(l.new_data) : '—';
+                return `
                 <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
                     <td class="p-3 font-mono text-[11px]">${new Date(l.changed_at).toLocaleString()}</td>
-                    <td class="p-3 font-bold text-sky-800">${l.user_email || 'System'} <span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">${l.user_role || 'API'}</span></td>
-                    <td class="p-3 uppercase font-extrabold ${l.action === 'INSERT' ? 'text-emerald-700' : (l.action === 'UPDATE' ? 'text-amber-700' : 'text-rose-700')}">${l.action}</td>
-                    <td class="p-3 font-mono text-xs">${l.table_name}</td>
-                    <td class="p-3 font-mono text-[10px] text-slate-600 truncate max-w-[200px]" title="${JSON.stringify(l.new_data)}">${l.new_data ? JSON.stringify(l.new_data) : '—'}</td>
+                    <td class="p-3 font-bold text-sky-800">${escapeHtml(l.user_email || 'System')} <span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">${escapeHtml(l.user_role || 'API')}</span></td>
+                    <td class="p-3 uppercase font-extrabold ${l.action === 'INSERT' ? 'text-emerald-700' : (l.action === 'UPDATE' ? 'text-amber-700' : 'text-rose-700')}">${escapeHtml(l.action)}</td>
+                    <td class="p-3 font-mono text-xs">${escapeHtml(l.table_name)}</td>
+                    <td class="p-3 font-mono text-[10px] text-slate-600 truncate max-w-[200px]" title="${escapeAttr(payloadJson)}">${escapeHtml(payloadJson)}</td>
                 </tr>
-            `).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500 font-medium">No audit logs found.</td></tr>';
+            `;
+            }).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500 font-medium">No audit logs found.</td></tr>';
 
             content.innerHTML = `
                 <div class="flex justify-between items-center mb-4 text-white">
@@ -6963,18 +7029,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <div class="bg-white p-4 rounded-xl shadow border"><p class="text-xs font-bold text-slate-700">Transshipment Hub Orders</p><h4 class="text-2xl font-extrabold text-emerald-700 mt-1">${transshipments.length}</h4></div>
                     </div>
                 `;
-            } else if (title === 'Hub Locations') {
+			} else if (title === 'Hub Locations') {
                 if (!requireAdminExecution("manage Hub Locations")) { closeSubModule(); return; }
                 let rows = hubLocations.length ? hubLocations.map((h, idx) => `
                     <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
-                        <td class="p-3 font-bold text-sky-900">${h.name}</td>
-                        <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900">${h.type || 'Terminal Hub'}</span></td>
-                        <td class="p-3 text-xs text-slate-700">${h.address || '—'}</td>
-                        <td class="p-3 font-mono text-[11px]">${h.lat}, ${h.lng}</td>
-                        <td class="p-3 font-mono text-xs">${h.radius || 5} km</td>
+                        <td class="p-3 font-bold text-sky-900">${escapeHtml(h.name)}</td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900">${escapeHtml(h.type || 'Terminal Hub')}</span></td>
+                        <td class="p-3 text-xs text-slate-700">${escapeHtml(h.address || '—')}</td>
+                        <td class="p-3 font-mono text-[11px]">${escapeHtml(h.lat)}, ${escapeHtml(h.lng)}</td>
+                        <td class="p-3 font-mono text-xs">${escapeHtml(h.radius || 5)} km</td>
                         <td class="p-3 text-right space-x-1">
-                            <button onclick="openBackendEntryModal('Hub', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Hub', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>
+                            <button onclick="openBackendEntryModal('Hub', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Hub', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>
                         </td>
                     </tr>
                 `).join('') : `<tr><td colspan="6" class="p-6 text-center text-slate-500 font-medium">
@@ -7062,19 +7128,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     </div>
                 `;
                 setTimeout(renderExpenseForecastView, 50);
-            } else if (title === 'Report Templates') {
+			} else if (title === 'Report Templates') {
                 const templates = db.reportTemplates || [];
                 const tplRows = templates.length ? templates.map((t, idx) => `
                     <tr class="border-b hover:bg-slate-50 font-medium text-slate-900">
-                        <td class="p-3 font-bold text-purple-900">${t.name}</td>
-                        <td class="p-3">${(REPORT_DATASET_SCHEMAS[t.dataset] || {}).label || t.dataset}</td>
-                        <td class="p-3 font-mono text-[10px] text-slate-700">${(t.columns || []).join(', ')}</td>
-                        <td class="p-3 uppercase text-[10px] font-bold">${t.orientation || 'portrait'}</td>
+                        <td class="p-3 font-bold text-purple-900">${escapeHtml(t.name)}</td>
+                        <td class="p-3">${escapeHtml((REPORT_DATASET_SCHEMAS[t.dataset] || {}).label || t.dataset)}</td>
+                        <td class="p-3 font-mono text-[10px] text-slate-700">${escapeHtml((t.columns || []).join(', '))}</td>
+                        <td class="p-3 uppercase text-[10px] font-bold">${escapeHtml(t.orientation || 'portrait')}</td>
                         <td class="p-3 text-right space-x-1">
-                            <button onclick="runCustomReportTemplate(${idx}, 'pdf')" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">PDF</button>
-                            <button onclick="runCustomReportTemplate(${idx}, 'csv')" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-bold text-[10px]">CSV</button>
-                            ${isAdmin ? `<button onclick="editReportTemplate(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('ReportTemplate', ${idx})" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : ''}
+                            <button onclick="runCustomReportTemplate(${Number(idx)}, 'pdf')" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">PDF</button>
+                            <button onclick="runCustomReportTemplate(${Number(idx)}, 'csv')" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-bold text-[10px]">CSV</button>
+                            ${isAdmin ? `<button onclick="editReportTemplate(${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('ReportTemplate', ${Number(idx)})" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : ''}
                         </td>
                     </tr>
                 `).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No custom report templates saved yet. Create one above.</td></tr>';
@@ -7129,32 +7195,22 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     </div>
                 `;
                 setTimeout(() => updateReportTemplateColumnsUI(), 30);
-            } else if (title === 'Vehicle Management') {
+			} else if (title === 'Vehicle Management') {
                 let rows = vehicles.length ? vehicles.map((v, idx) => {
                     let atts = renderPhotoThumbnailsForReport(v.attachments, 'No files');
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-bold font-mono">${v.id}</td>
-                        <td class="p-3">${v.model}</td>
-                        <td class="p-3"><span class="px-2 py-1 rounded text-[10px] font-bold bg-sky-100 text-sky-900">${v.status}</span></td>
-                        <td class="p-3 font-semibold">${v.driver || 'Unassigned'}</td>
+                        <td class="p-3 font-bold font-mono">${escapeHtml(v.id)}</td>
+                        <td class="p-3">${escapeHtml(v.model)}</td>
+                        <td class="p-3"><span class="px-2 py-1 rounded text-[10px] font-bold bg-sky-100 text-sky-900">${escapeHtml(v.status)}</span></td>
+                        <td class="p-3 font-semibold">${escapeHtml(v.driver || 'Unassigned')}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Vehicle', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Vehicle', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Vehicle', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Vehicle', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No vehicles registered.</td></tr>';
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <h3 class="text-xl font-bold"><i class="fa-solid fa-truck text-blue-400 mr-2"></i> Vehicle Masterlist</h3>
-                        <div class="flex gap-2">
-                            <button onclick="generateModulePDFReport('Vehicle Masterlist')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
-                            <button onclick="generateModuleExcelReport('Vehicle Masterlist')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Vehicle')" class="bg-blue-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Add Vehicle</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3"><table class="w-full text-left text-xs"><tr class="border-b text-slate-800 font-bold"><th class="p-3">Unit ID</th><th class="p-3">Model</th><th class="p-3">Status</th><th class="p-3">Assigned Driver</th><th class="p-3">Attached Photo / Files</th><th class="p-3 text-right">Actions</th></tr>` + rows + `</table></div>
-                `;
+                ...
             } else if (title === 'Driver Management') {
                 let rows = drivers.length ? drivers.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No ID attached');
@@ -7164,153 +7220,83 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     const hName = d.helper_name || '—';
                     const hPhone = d.helper_phone || '—';
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-bold">${dName}</td>
-                        <td class="p-3 font-mono">${dLic}</td>
-                        <td class="p-3 font-mono text-[11px]">${dPhone}</td>
-                        <td class="p-3 font-mono text-[11px]">${hName}<br><span class="text-slate-500">${hPhone}</span></td>
-                        <td class="p-3"><span class="px-2 py-1 rounded text-[10px] font-bold bg-indigo-100 text-indigo-900">${d.status || 'Available'}</span></td>
-                        <td class="p-3 font-bold text-amber-700">${d.rating || '5.0 ★'}</td>
+                        <td class="p-3 font-bold">${escapeHtml(dName)}</td>
+                        <td class="p-3 font-mono">${escapeHtml(dLic)}</td>
+                        <td class="p-3 font-mono text-[11px]">${escapeHtml(dPhone)}</td>
+                        <td class="p-3 font-mono text-[11px]">${escapeHtml(hName)}<br><span class="text-slate-500">${escapeHtml(hPhone)}</span></td>
+                        <td class="p-3"><span class="px-2 py-1 rounded text-[10px] font-bold bg-indigo-100 text-indigo-900">${escapeHtml(d.status || 'Available')}</span></td>
+                        <td class="p-3 font-bold text-amber-700">${escapeHtml(d.rating || '5.0 ★')}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="openNewDriverRegistrationModal(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Driver', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
+                            ${isAdmin ? `<button onclick="openNewDriverRegistrationModal(${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Driver', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="8" class="p-4 text-center text-slate-500 font-medium">No drivers registered.</td></tr>';
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <h3 class="text-xl font-bold"><i class="fa-solid fa-users text-indigo-400 mr-2"></i> Driver Management</h3>
-                        <div class="flex gap-2">
-                            <button onclick="generateModulePDFReport('Driver Management')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
-                            <button onclick="generateModuleExcelReport('Driver Management')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
-                            ${isAdmin ? `<button onclick="openNewDriverRegistrationModal()" class="bg-indigo-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Register New Driver</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3"><table class="w-full text-left text-xs"><tr class="border-b text-slate-800 font-bold"><th class="p-3">Driver Name</th><th class="p-3">License Number</th><th class="p-3">Driver Mobile</th><th class="p-3">Helper & Mobile</th><th class="p-3">Status</th><th class="p-3">Rating</th><th class="p-3">ID / Photo Files</th><th class="p-3 text-right">Actions</th></tr>` + rows + `</table></div>
-                `;
-            } else if (title === 'User Management') {
-                if (!requireAdminExecution("access RBAC User Management")) { closeSubModule(); return; }
-                let users = db.systemUsers || [];
-                let userRows = users.length ? users.map((u, index) => `
-                    <tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-bold">${u.email}</td>
-                        <td class="p-3 uppercase"><span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${u.role === 'admin' ? 'bg-emerald-100 text-emerald-900' : (u.role === 'dispatcher' ? 'bg-sky-100 text-sky-900' : (u.role === 'yard_manager' ? 'bg-amber-100 text-amber-900' : (u.role === 'accounting_reports' ? 'bg-teal-100 text-teal-900' : 'bg-purple-100 text-purple-900')))}">${u.role.replace('_', ' ')}</span></td>
-                        <td class="p-3">${new Date(u.createdAt).toLocaleDateString()}</td>
-                        <td class="p-3 text-right space-x-1">
-                            <button onclick="editSystemUserRole(${index})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded text-[10px] font-bold transition">Edit Role</button>
-                            <button onclick="deleteSystemUser(${index})" class="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded text-[10px] font-bold transition">Delete (Auth & RBAC)</button>
-                        </td>
-                    </tr>
-                `).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500 font-medium">No custom users provisioned yet. (Default admin session active)</td></tr>';
-
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <div>
-                            <h3 class="text-xl font-bold"><i class="fa-solid fa-user-shield text-sky-400 mr-2"></i> User Provisioning & RBAC Access Rights</h3>
-                            <p class="text-xs text-slate-300">Add new users, configure role permissions, or delete accounts from both RBAC & Database Authentication.</p>
-                        </div>
-                        <button onclick="openNewUserRegistrationModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-2 rounded-lg font-bold">+ Add New User</button>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
-                        <table class="w-full text-left text-xs">
-                            <tr class="border-b text-slate-800 font-bold"><th class="p-3">User Email</th><th class="p-3">Assigned Role</th><th class="p-3">Date Provisioned</th><th class="p-3 text-right">Actions (Admin)</th></tr>
-                            ${userRows}
-                        </table>
-                    </div>
-                `;
+                ...
             } else if (title === 'Fuel Monitoring') {
                 let rows = fuelLogs.length ? fuelLogs.map((f, idx) => {
                     let atts = renderPhotoThumbnailsForReport(f.attachments, 'No receipt');
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-mono font-bold text-sky-800">${f.unit}</td>
-                        <td class="p-3">${f.liters}</td>
-                        <td class="p-3 font-bold text-emerald-700">${f.cost}</td>
-                        <td class="p-3">${f.station}</td>
-                        <td class="p-3">${f.date}</td>
+                        <td class="p-3 font-mono font-bold text-sky-800">${escapeHtml(f.unit)}</td>
+                        <td class="p-3">${escapeHtml(f.liters)}</td>
+                        <td class="p-3 font-bold text-emerald-700">${escapeHtml(f.cost)}</td>
+                        <td class="p-3">${escapeHtml(f.station)}</td>
+                        <td class="p-3">${escapeHtml(f.date)}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Fuel', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Fuel', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Fuel', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Fuel', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No fuel logs.</td></tr>';
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <h3 class="text-xl font-bold"><i class="fa-solid fa-gas-pump text-amber-400 mr-2"></i> Fuel Monitoring</h3>
-                        <div class="flex gap-2">
-                            <button onclick="generateModulePDFReport('Fuel Monitoring')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
-                            <button onclick="generateModuleExcelReport('Fuel Monitoring')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Fuel')" class="bg-amber-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Log Fuel Fill</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3"><table class="w-full text-left text-xs"><tr class="border-b text-slate-800 font-bold"><th class="p-3">Unit ID</th><th class="p-3">Volume</th><th class="p-3">Cost</th><th class="p-3">Station</th><th class="p-3">Date</th><th class="p-3">Receipt/ Photo</th><th class="p-3 text-right">Actions</th></tr>` + rows + `</table></div>
-                `;
+                ...
             } else if (title === 'Maintenance') {
                 let rows = maintenanceLogs.length ? maintenanceLogs.map((m, idx) => {
                     let atts = renderPhotoThumbnailsForReport(m.attachments, 'No report');
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-mono font-bold text-sky-800">${m.unit}</td>
-                        <td class="p-3">${m.issue}</td>
-                        <td class="p-3 font-bold text-rose-700">${m.cost}</td>
-                        <td class="p-3 font-bold text-slate-900">${m.status}</td>
-                        <td class="p-3">${m.date}</td>
+                        <td class="p-3 font-mono font-bold text-sky-800">${escapeHtml(m.unit)}</td>
+                        <td class="p-3">${escapeHtml(m.issue)}</td>
+                        <td class="p-3 font-bold text-rose-700">${escapeHtml(m.cost)}</td>
+                        <td class="p-3 font-bold text-slate-900">${escapeHtml(m.status)}</td>
+                        <td class="p-3">${escapeHtml(m.date)}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Maintenance', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Maintenance', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Maintenance', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Maintenance', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No maintenance logs.</td></tr>';
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <h3 class="text-xl font-bold"><i class="fa-solid fa-screwdriver-wrench text-rose-400 mr-2"></i> Fleet Maintenance</h3>
-                        <div class="flex gap-2">
-                            <button onclick="generateModulePDFReport('Fleet Maintenance')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
-                            <button onclick="generateModuleExcelReport('Fleet Maintenance')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Maintenance')" class="bg-rose-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Schedule Maintenance</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3"><table class="w-full text-left text-xs"><tr class="border-b text-slate-800 font-bold"><th class="p-3">Unit ID</th><th class="p-3">Issue</th><th class="p-3">Cost</th><th class="p-3">Status</th><th class="p-3">Date</th><th class="p-3">Photo/ Attached File</th><th class="p-3 text-right">Actions</th></tr>` + rows + `</table></div>
-                `;
+                ...
             } else if (title === 'GPS & Dispatch') {
                 let rows = dispatchLogs.length ? dispatchLogs.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No waybill');
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-mono font-bold text-sky-800">${d.unit}</td>
-                        <td class="p-3">${d.route}</td>
-                        <td class="p-3">${d.driver}</td>
-                        <td class="p-3 text-emerald-700 font-bold">${d.status}</td>
+                        <td class="p-3 font-mono font-bold text-sky-800">${escapeHtml(d.unit)}</td>
+                        <td class="p-3">${escapeHtml(d.route)}</td>
+                        <td class="p-3">${escapeHtml(d.driver)}</td>
+                        <td class="p-3 text-emerald-700 font-bold">${escapeHtml(d.status)}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            <button onclick="openBackendEntryModal('Dispatch', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            ${isAdmin ? `<button onclick="deleteBackendRecord('Dispatch', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : ''}
+                            <button onclick="openBackendEntryModal('Dispatch', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            ${isAdmin ? `<button onclick="deleteBackendRecord('Dispatch', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : ''}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No active dispatches.</td></tr>';
-                content.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 text-white">
-                        <h3 class="text-xl font-bold"><i class="fa-solid fa-location-crosshairs text-emerald-400 mr-2"></i> GPS & Dispatch</h3>
-                        <div class="flex gap-2">
-                            <button onclick="generateModulePDFReport('GPS & Dispatch')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
-                            <button onclick="generateModuleExcelReport('GPS & Dispatch')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
-                            <button onclick="openBackendEntryModal('Dispatch')" class="bg-emerald-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ New Dispatch</button>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3"><table class="w-full text-left text-xs"><tr class="border-b text-slate-800 font-bold"><th class="p-3">Unit ID</th><th class="p-3">Route</th><th class="p-3">Driver</th><th class="p-3">Status</th><th class="p-3">Waybill Photo/ File</th><th class="p-3 text-right">Actions</th></tr>` + rows + `</table></div>
-                `;
+                ...
             } else if (title === 'Fleet Expenses') {
                 let rows = expenseLogs.length ? expenseLogs.map((e, idx) => {
                     let atts = renderPhotoThumbnailsForReport(e.attachments, 'No receipt');
                     return `<tr class="border-b font-medium text-slate-900">
-                        <td class="p-3 font-bold text-sky-800">${e.trip}</td>
-                        <td class="p-3">${e.fuel}</td>
-                        <td class="p-3">${e.tolls}</td>
-                        <td class="p-3">${e.maintenance}</td>
-                        <td class="p-3 font-extrabold text-emerald-700">${e.total}</td>
+                        <td class="p-3 font-bold text-sky-800">${escapeHtml(e.trip)}</td>
+                        <td class="p-3">${escapeHtml(e.fuel)}</td>
+                        <td class="p-3">${escapeHtml(e.tolls)}</td>
+                        <td class="p-3">${escapeHtml(e.maintenance)}</td>
+                        <td class="p-3 font-extrabold text-emerald-700">${escapeHtml(e.total)}</td>
                         <td class="p-3">${atts}</td>
                         <td class="p-3 text-right space-x-1">
-                            ${isAdmin ? `<button onclick="openBackendEntryModal('Expense', ${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
-                            <button onclick="deleteBackendRecord('Expense', ${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Expense', ${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2 py-1 rounded font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteBackendRecord('Expense', ${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">View Only</span>'}
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No fleet expenses.</td></tr>';
@@ -8163,23 +8149,27 @@ Skymover Transport is not liable for charges incurred due to operational constra
             refreshYardDashboard();
         }
 
-        async function acceptPendingContainerEntry(index) {
+		async function acceptPendingContainerEntry(index) {
             if (!requireYardOperationExecution("accept a pending container submission")) return;
             const containers = yardDb.containers || [];
             const target = containers[index];
             if (!target) return;
             if (target.status === 'Released') {
-                alert('🔒 This container is already Released and locked from modification.');
+                showSkymoverNotice('This container is already Released and locked from modification.', 'warning');
                 return;
             }
-            if (!confirm(`Accept client submission for Container ${target.number} and mark status as Available?`)) return;
+            const ok = await showSkymoverConfirm(
+                `Accept client submission for Container ${target.number} and mark status as Available?`,
+                { title: 'Accept Container Submission', confirmText: 'Accept Container' }
+            );
+            if (!ok) return;
 
             target.status = 'Available';
             await syncYardContainerToSupabase(target);
             await saveCloudData();
             refreshYard();
             populateYardOutContainerDropdown();
-            alert(`✅ Container ${target.number} has been accepted and marked as Available!`);
+            showSkymoverNotice(`Container ${target.number} has been accepted and marked as Available.`, 'success');
         }
 
         function editContainerEntry(index) {
@@ -8230,7 +8220,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             form.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        function editYardRevenueEntry(index) {
+		function editYardRevenueEntry(index) {
             if (!requireAdminExecution("edit a Yard Revenue record")) return;
             const revenues = yardDb.revenues || [];
             const target = revenues[index];
@@ -8249,11 +8239,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 <h3 class="text-xl font-bold text-white mb-4"><i class="fa-solid fa-pen-to-square text-emerald-400 mr-2"></i> Edit Yard Revenue Transaction</h3>
                 <form id="editYardRevenueForm" onsubmit="handleUpdateYardRevenueSubmit(event)" class="space-y-4 text-xs">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label class="block text-slate-300 mb-1 font-semibold">Transaction Date & Time *</label><input type="datetime-local" id="editRevDate" required value="${formattedDate}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
-                        <div><label class="block text-slate-300 mb-1 font-semibold">Source Type *</label><input type="text" id="editRevSource" required value="${target.source || ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
-                        <div><label class="block text-slate-300 mb-1 font-semibold">Container No. *</label><input type="text" id="editRevContainer" required value="${target.container || ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono"></div>
-                        <div><label class="block text-slate-300 mb-1 font-semibold">Reference / EIR</label><input type="text" id="editRevEir" value="${target.eir || ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono"></div>
-                        <div class="sm:col-span-2"><label class="block text-slate-300 mb-1 font-semibold">Amount (₱) *</label><input type="number" step="any" id="editRevAmount" required value="${target.amount || 0}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-emerald-400 font-bold text-sm"></div>
+                        <div><label class="block text-slate-300 mb-1 font-semibold">Transaction Date & Time *</label><input type="datetime-local" id="editRevDate" required value="${escapeAttr(formattedDate)}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
+                        <div><label class="block text-slate-300 mb-1 font-semibold">Source Type *</label><input type="text" id="editRevSource" required value="${escapeAttr(target.source || '')}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></div>
+                        <div><label class="block text-slate-300 mb-1 font-semibold">Container No. *</label><input type="text" id="editRevContainer" required value="${escapeAttr(target.container || '')}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono"></div>
+                        <div><label class="block text-slate-300 mb-1 font-semibold">Reference / EIR</label><input type="text" id="editRevEir" value="${escapeAttr(target.eir || '')}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono"></div>
+                        <div class="sm:col-span-2"><label class="block text-slate-300 mb-1 font-semibold">Amount (₱) *</label><input type="number" step="any" id="editRevAmount" required value="${escapeAttr(target.amount || 0)}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-emerald-400 font-bold text-sm"></div>
                     </div>
                     <div class="flex gap-2 pt-2">
                         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-lg transition">Update Revenue Record</button>
