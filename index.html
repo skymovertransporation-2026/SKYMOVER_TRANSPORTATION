@@ -3664,14 +3664,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-		async function verifyAdminPassword(pwd) {
-		    if (!pwd || !supabaseClient || !currentUserEmail) return false;
-		    const { error } = await supabaseClient.auth.signInWithPassword({
-		        email: currentUserEmail,
-		        password: pwd
-		    });
-		    if (error) {
-		        alert('⛔ Incorrect Administrator password.');
+		function verifyAdminPassword(pwd) {
+		    if (!pwd || pwd !== "Skymover_Transportation_2026") {
+		        alert('⛔ Incorrect Database Reset Password.');
 		        return false;
 		    }
 		    return true;
@@ -3682,8 +3677,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         async function confirmResetBackendAndDriverDB() {
             if (!requireAdminExecution("reset Management Backend & Driver's Side records")) return;
-            const pwd = prompt('🔒 Enter Administrator Password to Reset Management Backend & Driver\'s Side Records (Empty Yard records will be preserved):');
-            if (!(await verifyAdminPassword(pwd))) return;
+            const pwd = prompt('🔒 Enter Database Reset Password to Reset Management Backend & Driver\'s Side Records (Empty Yard records will be preserved):');
+            if (!verifyAdminPassword(pwd)) return;
 
             try {
                 const backupPayload = {
@@ -3843,9 +3838,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // 2. RESET ALL RECORDS: EMPTY CONTAINER YARD ONLY
         // ==========================================
         async function confirmResetEmptyYardDB() {
-            if (!requireAdminExecution("reset Empty Yard records")) return;
-            const pwd = prompt('🔒 Enter Administrator Password to Reset Empty Yard Records (Management Backend & Driver\'s Side records will be preserved):');
-            if (!(await verifyAdminPassword(pwd))) return;
+			if (!requireAdminExecution("reset Empty Yard records")) return;
+            const pwd = prompt('🔒 Enter Database Reset Password to Reset Empty Yard Records (Management Backend & Driver\'s Side records will be preserved):');
+            if (!verifyAdminPassword(pwd)) return;
 
             try {
                 const backupPayload = {
