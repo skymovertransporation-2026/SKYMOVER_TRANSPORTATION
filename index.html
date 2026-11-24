@@ -7284,7 +7284,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </table>
                     </div>
                 `;
-            } else if (title === 'Driver Management') {
+			} else if (title === 'Driver Management') {
                 let rows = drivers.length ? drivers.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No ID attached');
                     const dName = d.driver_name || d.name || '—';
@@ -7306,7 +7306,38 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="8" class="p-4 text-center text-slate-500 font-medium">No drivers registered.</td></tr>';
-            } else if (title === 'Fuel Monitoring') {
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-id-card text-purple-400 mr-2"></i> Driver & Helper Roster</h3>
+                            <p class="text-xs text-slate-300">Manage registered drivers, licenses, helpers, ratings, and ID attachments.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateModulePDFReport('Driver Management')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
+                            <button onclick="generateModuleExcelReport('Driver Management')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
+                            ${isAdmin ? `<button onclick="openNewDriverRegistrationModal()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Register Driver</button>` : ''}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Driver Name</th>
+                                    <th class="p-3">License No.</th>
+                                    <th class="p-3">Driver Mobile</th>
+                                    <th class="p-3">Helper</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Rating</th>
+                                    <th class="p-3">ID / Photo</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+			} else if (title === 'Fuel Monitoring') {
                 let rows = fuelLogs.length ? fuelLogs.map((f, idx) => {
                     let atts = renderPhotoThumbnailsForReport(f.attachments, 'No receipt');
                     return `<tr class="border-b font-medium text-slate-900">
@@ -7322,7 +7353,37 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No fuel logs.</td></tr>';
-            } else if (title === 'Maintenance') {
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-gas-pump text-amber-400 mr-2"></i> Fuel Monitoring & Receipts</h3>
+                            <p class="text-xs text-slate-300">Track diesel/fuel fill volume, station expenses, and receipt photos.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateModulePDFReport('Fuel Monitoring')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
+                            <button onclick="generateModuleExcelReport('Fuel Monitoring')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Fuel')" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Log Fuel Fill</button>` : ''}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Unit ID</th>
+                                    <th class="p-3">Volume</th>
+                                    <th class="p-3">Cost</th>
+                                    <th class="p-3">Station</th>
+                                    <th class="p-3">Date</th>
+                                    <th class="p-3">Receipt Photo</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+			} else if (title === 'Maintenance') {
                 let rows = maintenanceLogs.length ? maintenanceLogs.map((m, idx) => {
                     let atts = renderPhotoThumbnailsForReport(m.attachments, 'No report');
                     return `<tr class="border-b font-medium text-slate-900">
@@ -7338,7 +7399,37 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500 font-medium">No maintenance logs.</td></tr>';
-            } else if (title === 'GPS & Dispatch') {
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-screwdriver-wrench text-rose-400 mr-2"></i> Fleet Maintenance & Repairs</h3>
+                            <p class="text-xs text-slate-300">Schedule and track vehicle repairs, shop status, costs, and service photos.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateModulePDFReport('Fleet Maintenance')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
+                            <button onclick="generateModuleExcelReport('Fleet Maintenance')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Maintenance')" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Schedule Maintenance</button>` : ''}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Unit ID</th>
+                                    <th class="p-3">Issue / Service</th>
+                                    <th class="p-3">Est. Cost</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Date</th>
+                                    <th class="p-3">Service Photo</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+			} else if (title === 'GPS & Dispatch') {
                 let rows = dispatchLogs.length ? dispatchLogs.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No waybill');
                     return `<tr class="border-b font-medium text-slate-900">
@@ -7353,6 +7444,35 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No active dispatches.</td></tr>';
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-location-crosshairs text-emerald-400 mr-2"></i> GPS & Dispatch Logs</h3>
+                            <p class="text-xs text-slate-300">Assign routes, monitor live trip status, and view waybill attachments.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateModulePDFReport('GPS & Dispatch')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
+                            <button onclick="generateModuleExcelReport('GPS & Dispatch')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
+                            ${['admin', 'dispatcher'].includes(currentUserRole) ? `<button onclick="openBackendEntryModal('Dispatch')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ New Dispatch</button>` : ''}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Unit ID</th>
+                                    <th class="p-3">Route / Destination</th>
+                                    <th class="p-3">Driver</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Waybill Photo</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
             } else if (title === 'Fleet Expenses') {
                 let rows = expenseLogs.length ? expenseLogs.map((e, idx) => {
                     let atts = renderPhotoThumbnailsForReport(e.attachments, 'No receipt');
