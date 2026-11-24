@@ -5947,10 +5947,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <h3 class="text-xl font-bold"><i class="fa-solid fa-clock-rotate-left text-amber-400 mr-2"></i> System Audit Trail</h3>
                         <p class="text-xs text-slate-300">Live tracking of administrative and operational modifications across Skymover.</p>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="exportAuditLogsCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Export CSV</button>
-                        <button onclick="loadAuditLogsModal()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold"><i class="fa-solid fa-rotate mr-1"></i> Refresh</button>
-                    </div>
+						<div class="flex gap-2">
+	                        <button onclick="backupAndCleanAuditLogs()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold"><i class="fa-solid fa-broom mr-1"></i> Backup &amp; Clean</button>
+	                        <button onclick="exportAuditLogsCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Export CSV</button>
+	                        <button onclick="loadAuditLogsModal()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold"><i class="fa-solid fa-rotate mr-1"></i> Refresh</button>
+	                    </div>
                 </div>
                 <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3 shadow-inner">
                     <table class="w-full text-left text-xs">
@@ -6001,6 +6002,86 @@ Skymover Transport is not liable for charges incurred due to operational constra
             document.body.removeChild(link);
         }
 
+		async function backupAndCleanAuditLogs() {
+		    if (!requireAdminExecution("backup and clean audit logs")) return;
+		    if (!supabaseClient) return;
+		
+		    const { data: allLogs, error: fetchErr } = await supabaseClient
+		        .from('v_audit_logs')
+		        .select('*')
+		        .order('changed_at', { ascending: false });
+		
+		    if (fetchErr) {
+		        alert('Error fetching audit logs for backup: ' + fetchErr.message);
+		        return;
+		    }
+		
+		    const logCount = (allLogs || []).length;
+		    if (logCount === 0) {
+		        alert('ℹ️ There are no audit log records to back up or clean.');
+		        return;
+		    }
+		
+		    // 1. Always download JSON backup first
+		    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+		    const backupObj = {
+		        exportedAt: new Date().toISOString(),
+		        exportedBy: currentUserEmail || 'admin',
+		        sourceView: 'v_audit_logs',
+		        recordCount: logCount,
+		        logs: allLogs
+		    };
+		    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+		    const dlAnchor = document.createElement('a');
+		    dlAnchor.setAttribute("href", dataStr);
+		    dlAnchor.setAttribute("download", `Skymover_Audit_Logs_Backup_${timestamp}.json`);
+		    document.body.appendChild(dlAnchor);
+		    dlAnchor.click();
+		    dlAnchor.remove();
+		
+		    // 2. Ask whether to clean ALL logs or only logs older than N days
+		    const modeInput = prompt(
+		        `✅ Backup downloaded (${logCount} log(s)).\n\n` +
+		        `Choose cleanup option:\n` +
+		        `• Type ALL to delete all ${logCount} audit log row(s)\n` +
+		        `• Or enter a number of days (e.g. 30) to delete logs older than that many days\n` +
+		        `• Or click Cancel to keep all logs in Supabase`,
+		        "30"
+		    );
+		
+		    if (modeInput === null) return;
+		    const trimmed = modeInput.trim();
+		    if (!trimmed) return;
+		
+		    let deleteQuery = supabaseClient.from('audit_logs').delete();
+		    let confirmText = "";
+		
+		    if (trimmed.toUpperCase() === "ALL") {
+		        confirmText = `⚠️ Permanently delete ALL ${logCount} audit log record(s) from public.audit_logs?`;
+		        deleteQuery = deleteQuery.not('id', 'is', null);
+		    } else {
+		        const days = parseInt(trimmed, 10);
+		        if (isNaN(days) || days < 1) {
+		            alert('⚠️ Enter ALL or a valid positive number of days (e.g. 30).');
+		            return;
+		        }
+		        const cutoffIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+		        confirmText = `⚠️ Permanently delete audit logs older than ${days} day(s) (before ${new Date(cutoffIso).toLocaleString()}) from public.audit_logs?`;
+		        deleteQuery = deleteQuery.lt('changed_at', cutoffIso);
+		    }
+		
+		    if (!confirm(confirmText)) return;
+		
+		    const { error: delErr } = await deleteQuery;
+		    if (delErr) {
+		        alert('❌ Failed to clean audit_logs: ' + delErr.message + '\n\nCheck that public.audit_logs exists and allows admin DELETE.');
+		        return;
+		    }
+		
+		    alert('✅ Audit log backup saved and selected logs cleaned from public.audit_logs.');
+		    await loadAuditLogsModal();
+		}
+		
         function openNewUserRegistrationModal() {
             if (!requireAdminExecution("provision new RBAC users")) return;
             const modal = document.getElementById('subModuleModal');
