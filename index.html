@@ -7255,6 +7255,35 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>`;
                 }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No vehicles registered.</td></tr>';
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-truck text-sky-400 mr-2"></i> Vehicle Masterlist</h3>
+                            <p class="text-xs text-slate-300">Manage fleet units, operational status, driver assignments, and photos.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="generateModulePDFReport('Vehicle Masterlist')" class="bg-rose-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-pdf mr-1"></i> PDF Report</button>
+                            <button onclick="generateModuleExcelReport('Vehicle Masterlist')" class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded font-bold"><i class="fa-solid fa-file-excel mr-1"></i> Excel Export</button>
+                            ${isAdmin ? `<button onclick="openBackendEntryModal('Vehicle')" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">+ Add Vehicle</button>` : ''}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Unit ID</th>
+                                    <th class="p-3">Model</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Assigned Driver</th>
+                                    <th class="p-3">Attached Files</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
             } else if (title === 'Driver Management') {
                 let rows = drivers.length ? drivers.map((d, idx) => {
                     let atts = renderPhotoThumbnailsForReport(d.attachments, 'No ID attached');
