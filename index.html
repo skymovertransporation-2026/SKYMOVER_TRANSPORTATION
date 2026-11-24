@@ -6076,12 +6076,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		                body: { email, password, role }
 		            });
 		
-		            if (error) {
+					if (error) {
 		                const status = error.context?.status;
+		                let detailedMsg = error.message || 'Failed to provision user';
+		                try {
+		                    if (error.context && typeof error.context.json === 'function') {
+		                        const errBody = await error.context.json();
+		                        if (errBody?.error) detailedMsg = `${errBody.error} (HTTP ${status || 'error'})`;
+		                    }
+		                } catch (_) {}
+		
 		                if (status === 504) {
 		                    alert("Database Auth Notice: HTTP 504 (Request timed out on the server/email/hook). Check Supabase Auth Logs & Edge Function logs before retrying.");
 		                } else {
-		                    alert("Database Auth Notice: " + (error.message || 'Failed to provision user'));
+		                    alert("Database Auth Notice: " + detailedMsg);
 		                }
 		                return;
 		            }
