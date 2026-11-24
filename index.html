@@ -7195,6 +7195,51 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     </div>
                 `;
                 setTimeout(() => updateReportTemplateColumnsUI(), 30);
+            } else if (title === 'User Management') {
+                if (!requireAdminExecution("manage RBAC Users")) { closeSubModule(); return; }
+                const users = db.systemUsers || [];
+                const userRows = users.length ? users.map((u, idx) => `
+                    <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
+                        <td class="p-3 font-bold text-slate-900">${escapeHtml(u.email)}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-sky-100 text-sky-900">
+                                ${escapeHtml((u.role || 'guest').replace('_', ' '))}
+                            </span>
+                        </td>
+                        <td class="p-3 font-mono text-[11px] text-slate-600">
+                            ${u.createdAt ? escapeHtml(new Date(u.createdAt).toLocaleString()) : '—'}
+                        </td>
+                        <td class="p-3 text-right space-x-1">
+                            <button onclick="editSystemUserRole(${Number(idx)})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit Role</button>
+                            <button onclick="deleteSystemUser(${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500 font-medium">No RBAC users provisioned in list yet.</td></tr>';
+
+                content.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                        <div>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-user-shield text-sky-400 mr-2"></i> RBAC User & Role Management</h3>
+                            <p class="text-xs text-slate-300">Provision user accounts and assign role-based access levels across Skymover.</p>
+                        </div>
+                        <button onclick="openNewUserRegistrationModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">
+                            + Register New User
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b text-slate-800 font-bold">
+                                <tr>
+                                    <th class="p-3">Email Address</th>
+                                    <th class="p-3">Assigned Role</th>
+                                    <th class="p-3">Created</th>
+                                    <th class="p-3 text-right">Actions (Admin)</th>
+                                </tr>
+                            </thead>
+                            <tbody>${userRows}</tbody>
+                        </table>
+                    </div>
+                `;
 			} else if (title === 'Vehicle Management') {
                 let rows = vehicles.length ? vehicles.map((v, idx) => {
                     let atts = renderPhotoThumbnailsForReport(v.attachments, 'No files');
