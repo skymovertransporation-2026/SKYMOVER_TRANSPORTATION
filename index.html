@@ -8438,7 +8438,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (e) {}
         }
 		
-        async function insertYardRevenueToSupabase(r) {
+		async function insertYardRevenueToSupabase(r) {
             if (!supabaseClient) return false;
             try {
                 const { data, error } = await supabaseClient.from('yard_revenues').insert({
@@ -8447,9 +8447,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     transaction_date: r.date ? new Date(r.date).toISOString() : new Date().toISOString(),
                     logged_by: isClientQrMode ? 'client_qr' : (currentUser ? currentUser.email : 'system')
                 }).select().single();
-                if (!error && data && data.id) r.id = data.id;
-                return !error;
-            } catch (e) { return false; }
+                if (error) {
+                    console.warn('insertYardRevenueToSupabase notice (check RLS policy on yard_revenues for role ' + currentUserRole + '):', error.message);
+                    return false;
+                }
+                if (data && data.id) r.id = data.id;
+                return true;
+            } catch (e) {
+                console.warn('insertYardRevenueToSupabase exception:', e.message || e);
+                return false;
+            }
         }
 
 		async function fetchYardMovementsFromSupabase() {
@@ -10600,6 +10607,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             yardDb.movements.unshift(movementRecord);
             await insertYardMovementToSupabase(movementRecord);
 
+			let revenueSyncedToCloud = true;
             if (totalAmount > 0) {
                 const revenueRecord = {
                     date: gateOutDate, source: 'Gate-Out & Storage Fee',
@@ -10607,7 +10615,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 };
                 if(!yardDb.revenues) yardDb.revenues = [];
                 yardDb.revenues.unshift(revenueRecord);
-                await insertYardRevenueToSupabase(revenueRecord);
+                revenueSyncedToCloud = await insertYardRevenueToSupabase(revenueRecord);
             }
 
 			await saveCloudData();
@@ -10634,7 +10642,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 })
                 .catch(err => console.warn('Gate-Out email error:', err));
 
-            alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
+			if (totalAmount > 0 && !revenueSyncedToCloud) {
+                alert('⚠️ Container gated out and released in yard_containers/yard_movements, but cloud insert into yard_revenues was blocked (403). Add an INSERT policy on public.yard_revenues for role "' + currentUserRole + '" in Supabase.');
+            } else {
+                alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
+            }
         }
 
 		function resolveRevenueEquipmentType(revRow) {
