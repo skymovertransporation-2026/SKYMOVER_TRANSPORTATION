@@ -585,17 +585,50 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 </div>
             </div>
 
-            <!-- Yard Tab 2: Inventory -->
+			<!-- Yard Tab 2: Inventory -->
             <div id="yardInventory" class="yard-tab hidden space-y-6">
+                <div id="yardClientRequestsPanel" class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-sky-200 space-y-4">
+                    <div class="flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-qrcode text-sky-600"></i>
+                                Pending Client QR Submissions
+                                <span id="clientQrPendingCountBadge" class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-900 text-[11px] font-extrabold">0</span>
+                            </h3>
+                            <p class="text-xs text-slate-600">Review Gate-In and Gate-Out requests submitted via the Client QR portal before adding them to active yard stock.</p>
+                        </div>
+                        <button type="button" onclick="fetchClientGateNotifications()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                            <i class="fa-solid fa-rotate mr-1"></i> Refresh Requests
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-900 font-medium">
+                            <thead class="bg-slate-100 text-slate-800">
+                                <tr>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3">Container No.</th>
+                                    <th class="p-3">Details / Plate / EIR</th>
+                                    <th class="p-3">Waiver Signature</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientGateNotificationsBody" class="divide-y divide-slate-200">
+                                <tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200">
                     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                         <div>
                             <h3 class="font-bold text-base text-slate-900">Empty Container Master Inventory</h3>
                             <p class="text-xs text-slate-600">Real-time status, condition, and location tracking.</p>
                         </div>
-						<div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <input type="text" id="yardSearchInput" oninput="renderYardInventory()" placeholder="Search container no, line, plate..." class="p-2 border rounded-lg text-xs w-64 bg-slate-50 text-slate-900 font-medium">
-							<select id="yardInventoryEquipmentFilter" onchange="renderYardInventory()" class="p-2 border rounded-lg text-xs bg-slate-50 text-slate-900 font-semibold">
+                            <select id="yardInventoryEquipmentFilter" onchange="renderYardInventory()" class="p-2 border rounded-lg text-xs bg-slate-50 text-slate-900 font-semibold">
                                 <option value="">All Equipment</option>
                                 <option value="Crawler Crane">Crawler Crane</option>
                                 <option value="Boom Truck">Boom Truck</option>
@@ -613,7 +646,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                                     <th class="p-3">Container No.</th>
                                     <th class="p-3">Size / Type</th>
                                     <th class="p-3">Shipping Line</th>
-									<th class="p-3">Equipment</th>
+                                    <th class="p-3">Equipment</th>
                                     <th class="p-3">Status</th>
                                     <th class="p-3">Yard Location</th>
                                     <th class="p-3">Gate-In</th>
@@ -9777,6 +9810,167 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
+		let pendingClientGateNotifications = [];
+
+        async function fetchClientGateNotifications() {
+            const tbody = document.getElementById('clientGateNotificationsBody');
+            const badge = document.getElementById('clientQrPendingCountBadge');
+            const panel = document.getElementById('yardClientRequestsPanel');
+
+            if (isClientQrMode) {
+                if (panel) panel.classList.add('hidden');
+                return;
+            }
+            if (panel) panel.classList.remove('hidden');
+
+            if (!supabaseClient) return;
+            try {
+                const { data, error } = await supabaseClient
+                    .from('gate_notifications')
+                    .select('*')
+                    .order('id', { ascending: false })
+                    .limit(50);
+
+                if (error) {
+                    console.warn('fetchClientGateNotifications notice:', error.message);
+                    return;
+                }
+
+                pendingClientGateNotifications = (data || []).filter(row => {
+                    const st = String(row.review_status || row.status || '').toUpperCase();
+                    return st !== 'ACCEPTED' && st !== 'REJECTED';
+                });
+
+                if (badge) badge.textContent = String(pendingClientGateNotifications.length);
+                renderClientGateNotificationsTable();
+            } catch (err) {
+                console.warn('fetchClientGateNotifications exception:', err.message || err);
+            }
+        }
+
+        function renderClientGateNotificationsTable() {
+            const tbody = document.getElementById('clientGateNotificationsBody');
+            if (!tbody) return;
+
+            const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
+            if (!pendingClientGateNotifications.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = pendingClientGateNotifications.map((req, idx) => {
+                const mType = req.movement_type || 'GATE_IN';
+                const isGateIn = String(mType).toUpperCase().includes('IN');
+                const detailLine = isGateIn
+                    ? `${escapeHtml(req.size || '—')} / ${escapeHtml(req.container_type || 'Dry')} • ${escapeHtml(req.shipping_line || '—')}<br><span class="font-mono text-[10px]">Plate: ${escapeHtml(req.truck_plate_number || '—')} • EIR: ${escapeHtml(req.eir_ref || '—')}</span>`
+                    : `To: ${escapeHtml(req.release_to_customer || '—')}<br><span class="font-mono text-[10px]">Plate: ${escapeHtml(req.truck_plate_number || '—')} • EIR: ${escapeHtml(req.gate_out_eir_ref || '—')}</span>`;
+
+                const waiverInfo = req.waiver_signature
+                    ? `<span class="font-bold text-slate-900">${escapeHtml(req.waiver_signature)}</span>`
+                    : '<span class="text-slate-400 italic">N/A</span>';
+
+                const actionsHtml = canReview
+                    ? `<button type="button" onclick="acceptClientGateNotification(${Number(idx)})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px] mr-1">Accept</button>
+                       <button type="button" onclick="rejectClientGateNotification(${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Reject</button>`
+                    : '<span class="text-[10px] text-slate-400">Read Only</span>';
+
+                return `
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-3 font-bold ${isGateIn ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(mType)}</td>
+                        <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(req.container_number || '—')}</td>
+                        <td class="p-3 text-xs">${detailLine}</td>
+                        <td class="p-3 text-xs">${waiverInfo}</td>
+                        <td class="p-3"><span class="pill Pending">Pending Review</span></td>
+                        <td class="p-3 text-right">${actionsHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function acceptClientGateNotification(idx) {
+            if (!requireYardOperationExecution("accept a Client QR submission")) return;
+            const req = pendingClientGateNotifications[idx];
+            if (!req) return;
+
+            const containerNo = String(req.container_number || '').trim().toUpperCase();
+            const isGateIn = String(req.movement_type || 'GATE_IN').toUpperCase().includes('IN');
+
+            if (isGateIn) {
+                const newContainer = {
+                    number: containerNo,
+                    size: req.size || '20FT',
+                    type: req.container_type || 'Dry',
+                    line: req.shipping_line || '—',
+                    truckingName: req.trucking_name || '',
+                    plate: String(req.truck_plate_number || '').trim().toUpperCase(),
+                    driver: req.driver_name || '',
+                    equipment: req.equipment || '',
+                    eir: req.eir_ref || '',
+                    condition: req.condition || 'Good',
+                    status: 'Available',
+                    block: req.block || 'A',
+                    bay: req.bay || 'BAY-1',
+                    row: req.yard_row || 'GROUND',
+                    tier: req.tier || '1',
+                    vanInAmount: Number(req.van_in_amount || 0),
+                    vanInStats: 'PAID',
+                    vanOutAmount: 0,
+                    date: req.gate_in_date ? formatIsoToLocalDateTimeInput(req.gate_in_date) : formatIsoToLocalDateTimeInput(new Date().toISOString()),
+                    etaDate: req.eta_date ? formatIsoToLocalDateTimeInput(req.eta_date) : '',
+                    gateInToD: req.gate_in_tod || 'MORNING',
+                    remarks: req.remarks || '',
+                    photos: []
+                };
+
+                if (!Array.isArray(yardDb.containers)) yardDb.containers = [];
+                yardDb.containers.unshift(newContainer);
+                await syncYardContainerToSupabase(newContainer);
+                await saveCloudData();
+            }
+
+            if (supabaseClient && req.id !== undefined && req.id !== null) {
+                try {
+                    await supabaseClient
+                        .from('gate_notifications')
+                        .delete()
+                        .eq('id', req.id);
+                } catch (err) {
+                    console.warn('gate_notifications cleanup notice:', err.message);
+                }
+            }
+
+            await fetchClientGateNotifications();
+            refreshYard();
+            populateYardOutContainerDropdown();
+            showSkymoverNotice(`Accepted ${containerNo} from Client QR queue.`, 'success');
+        }
+
+        async function rejectClientGateNotification(idx) {
+            if (!requireYardOperationExecution("reject a Client QR submission")) return;
+            const req = pendingClientGateNotifications[idx];
+            if (!req) return;
+
+            const ok = await showSkymoverConfirm(
+                `Reject and remove Client QR submission for Container ${req.container_number || '—'}?`,
+                { title: 'Reject Client Submission', confirmText: 'Reject', danger: true }
+            );
+            if (!ok) return;
+
+            if (supabaseClient && req.id !== undefined && req.id !== null) {
+                try {
+                    await supabaseClient
+                        .from('gate_notifications')
+                        .delete()
+                        .eq('id', req.id);
+                } catch (err) {
+                    console.warn('gate_notifications delete notice:', err.message);
+                }
+            }
+
+            await fetchClientGateNotifications();
+            showSkymoverNotice(`Rejected Client QR submission for ${req.container_number || 'container'}.`, 'warning');
+        }
+		
 		function renderYardInventory() {
             const tbody = document.getElementById('yardInventoryRows');
             if (!tbody) return;
@@ -9934,9 +10128,41 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                waiver_signed_at: signedAtIso
 			            };
 			
-			            if (supabaseClient) {
+						if (supabaseClient) {
 			                const { error } = await supabaseClient.from('gate_notifications').insert([requestPayload]);
 			                if (error) throw error;
+			
+			                const pendingInventoryRow = {
+			                    container_number: containerNo,
+			                    size: formData.get('size'),
+			                    container_type: formData.get('type') || 'Dry',
+			                    shipping_line: formData.get('line'),
+			                    trucking_name: (formData.get('truckingName') || '').trim(),
+			                    truck_plate: (formData.get('plate') || '').trim().toUpperCase(),
+			                    driver_name: (formData.get('driver') || '').trim(),
+			                    eir_ref: (formData.get('eir') || '').trim(),
+			                    condition: formData.get('condition') || 'Good',
+			                    status: 'Pending',
+			                    block: formData.get('block') || 'A',
+			                    bay: formData.get('bay') || 'BAY-1',
+			                    yard_row: formData.get('row') || 'GROUND',
+			                    tier: formData.get('tier') || '1',
+			                    van_in_amount: 0,
+			                    van_in_status: 'PENDING_REVIEW',
+			                    van_out_amount: 0,
+			                    gate_in_date: formData.get('date') ? new Date(formData.get('date')).toISOString() : null,
+			                    eta_date: formData.get('etaDate') ? new Date(formData.get('etaDate')).toISOString() : null,
+			                    gate_in_tod: formData.get('gateInToD') || 'MORNING',
+			                    remarks: (formData.get('remarks') || '').trim(),
+			                    photos: [...stagedGateInPhotos],
+			                    logged_by: 'client_qr',
+			                    updated_at: new Date().toISOString()
+			                };
+			
+			                const { error: invErr } = await supabaseClient.from('yard_containers').insert([pendingInventoryRow]);
+			                if (invErr) {
+			                    console.warn('Client QR pending yard_containers sync notice:', invErr.message);
+			                }
 			            }
 			
 			            await sendGateInEmailNotification({
