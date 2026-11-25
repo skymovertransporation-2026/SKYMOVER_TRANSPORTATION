@@ -2501,10 +2501,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             return true;
         }
 
-        function requireYardOperationExecution(actionLabel = "perform this yard operation") {
+		function requireYardOperationExecution(actionLabel = "perform this yard operation") {
             if (isClientQrMode) return true;
-            if (!['admin', 'yard_manager'].includes(currentUserRole)) {
-                alert(`⛔ RBAC Access Denied: Your role (${currentUserRole.replace('_', ' ')}) has read-only access and cannot ${actionLabel}.`);
+            const lowerAction = String(actionLabel || '').toLowerCase();
+            const isGateInOrOutAction = lowerAction.includes('gate-in') || lowerAction.includes('gate-out');
+            const allowedRoles = isGateInOrOutAction
+                ? ['admin', 'dispatcher']
+                : ['admin', 'dispatcher', 'yard_manager'];
+
+            if (!allowedRoles.includes(currentUserRole)) {
+                alert(`⛔ RBAC Access Denied: Your role (${currentUserRole.replace('_', ' ')}) does not have permission to ${actionLabel}.`);
                 return false;
             }
             return true;
@@ -3297,9 +3303,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if(navHubPortalBtn) navHubPortalBtn.style.display = 'none';
                 switchView('driver');
                 return;
-            } else if (role === 'yard_manager') {
+			} else if (role === 'yard_manager') {
                 if(cardBackend) cardBackend.style.display = 'none';
                 if(cardDriver) cardDriver.style.display = 'none';
+                if(yBtn3) yBtn3.style.display = 'none';
+                if(yBtn4) yBtn4.style.display = 'none';
                 if(yBtn8) yBtn8.style.display = 'none';
             } else if (role === 'accounting_reports') {
                 if(cardBackend) cardBackend.style.display = 'none';
@@ -3308,8 +3316,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if(yBtn4) yBtn4.style.display = 'none';
                 if(yBtn8) yBtn8.style.display = 'none';
             } else if (role === 'dispatcher') {
-                if(yBtn3) yBtn3.style.display = 'none';
-                if(yBtn4) yBtn4.style.display = 'none';
                 if(yBtn8) yBtn8.style.display = 'none';
             } else if (role !== 'admin') {
                 ['viewBackend', 'viewDriver', 'viewHub', 'viewYard', 'viewLanding'].forEach(v => {
@@ -8562,6 +8568,26 @@ Skymover Transport is not liable for charges incurred due to operational constra
             refreshYardDashboard();
         }
 
+		async function removeGateNotificationsByContainer(containerNo) {
+            const cleanNo = String(containerNo || '').trim().toUpperCase();
+            if (!cleanNo) return;
+
+            pendingClientGateNotifications = (pendingClientGateNotifications || []).filter(
+                r => String(r.container_number || '').trim().toUpperCase() !== cleanNo
+            );
+
+            if (supabaseClient) {
+                try {
+                    await supabaseClient
+                        .from('gate_notifications')
+                        .delete()
+                        .eq('container_number', cleanNo);
+                } catch (err) {
+                    console.warn('gate_notifications cleanup by container notice:', err.message);
+                }
+            }
+        }
+
 		async function acceptPendingContainerEntry(index) {
             if (!requireYardOperationExecution("accept a pending container submission")) return;
             const containers = yardDb.containers || [];
@@ -8577,12 +8603,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
             );
             if (!ok) return;
 
+            const cleanNo = String(target.number || '').trim().toUpperCase();
+            target.number = cleanNo;
             target.status = 'Available';
+            if (!target.vanInStats || target.vanInStats === 'PENDING_REVIEW') {
+                target.vanInStats = 'PAID';
+            }
+
+            yardDb.containers = (yardDb.containers || []).filter((c, i) => {
+                if (i === index) return true;
+                return !(String(c.number || '').trim().toUpperCase() === cleanNo && c.status === 'Pending');
+            });
+
             await syncYardContainerToSupabase(target);
+            await removeGateNotificationsByContainer(cleanNo);
             await saveCloudData();
+            await fetchClientGateNotifications();
             refreshYard();
             populateYardOutContainerDropdown();
-            showSkymoverNotice(`Container ${target.number} has been accepted and marked as Available.`, 'success');
+            showSkymoverNotice(`Container ${cleanNo} has been accepted, added to Master Inventory as Available, and removed from Pending Client QR Submissions.`, 'success');
         }
 
         function editContainerEntry(index) {
@@ -9677,12 +9716,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if (isClientQrMode) {
                 if (tabId !== 'yardGateIn' && tabId !== 'yardGateOut') tabId = 'yardGateIn';
                 localStorage.setItem('skymover_client_qr_tab', tabId);
-            } else {
+			} else {
                 if (currentUserRole === 'accounting_reports' && ['yardGateIn', 'yardGateOut', 'yardBackup', 'yardPortalSettings'].includes(tabId)) {
                     tabId = 'yardRevenue';
-                } else if (currentUserRole === 'dispatcher' && ['yardGateIn', 'yardGateOut', 'yardBackup', 'yardPortalSettings'].includes(tabId)) {
+                } else if (currentUserRole === 'dispatcher' && ['yardBackup', 'yardPortalSettings'].includes(tabId)) {
                     tabId = 'yardDashboard';
-                } else if (currentUserRole === 'yard_manager' && tabId === 'yardBackup') {
+                } else if (currentUserRole === 'yard_manager' && ['yardGateIn', 'yardGateOut', 'yardBackup'].includes(tabId)) {
                     tabId = 'yardDashboard';
                 }
                 localStorage.setItem('skymover_active_yard_tab', tabId);
@@ -9852,7 +9891,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const tbody = document.getElementById('clientGateNotificationsBody');
             if (!tbody) return;
 
-            const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
+            const canReview = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
             if (!pendingClientGateNotifications.length) {
                 tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>';
                 return;
@@ -9887,7 +9926,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }).join('');
         }
 
-        async function acceptClientGateNotification(idx) {
+		async function acceptClientGateNotification(idx) {
             if (!requireYardOperationExecution("accept a Client QR submission")) return;
             const req = pendingClientGateNotifications[idx];
             if (!req) return;
@@ -9896,35 +9935,50 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const isGateIn = String(req.movement_type || 'GATE_IN').toUpperCase().includes('IN');
 
             if (isGateIn) {
-                const newContainer = {
+                if (!Array.isArray(yardDb.containers)) yardDb.containers = [];
+
+                const existingIdx = yardDb.containers.findIndex(
+                    c => String(c.number || '').trim().toUpperCase() === containerNo && c.status !== 'Released'
+                );
+
+                const mergedContainer = {
+                    ...(existingIdx >= 0 ? yardDb.containers[existingIdx] : {}),
                     number: containerNo,
-                    size: req.size || '20FT',
-                    type: req.container_type || 'Dry',
-                    line: req.shipping_line || '—',
-                    truckingName: req.trucking_name || '',
-                    plate: String(req.truck_plate_number || '').trim().toUpperCase(),
-                    driver: req.driver_name || '',
-                    equipment: req.equipment || '',
-                    eir: req.eir_ref || '',
-                    condition: req.condition || 'Good',
+                    size: req.size || (existingIdx >= 0 ? yardDb.containers[existingIdx].size : '20FT'),
+                    type: req.container_type || (existingIdx >= 0 ? yardDb.containers[existingIdx].type : 'Dry'),
+                    line: req.shipping_line || (existingIdx >= 0 ? yardDb.containers[existingIdx].line : '—'),
+                    truckingName: req.trucking_name || (existingIdx >= 0 ? yardDb.containers[existingIdx].truckingName : ''),
+                    plate: String(req.truck_plate_number || (existingIdx >= 0 ? yardDb.containers[existingIdx].plate : '') || '').trim().toUpperCase(),
+                    driver: req.driver_name || (existingIdx >= 0 ? yardDb.containers[existingIdx].driver : ''),
+                    equipment: req.equipment || (existingIdx >= 0 ? yardDb.containers[existingIdx].equipment : ''),
+                    eir: req.eir_ref || (existingIdx >= 0 ? yardDb.containers[existingIdx].eir : ''),
+                    condition: req.condition || (existingIdx >= 0 ? yardDb.containers[existingIdx].condition : 'Good'),
                     status: 'Available',
-                    block: req.block || 'A',
-                    bay: req.bay || 'BAY-1',
-                    row: req.yard_row || 'GROUND',
-                    tier: req.tier || '1',
-                    vanInAmount: Number(req.van_in_amount || 0),
+                    block: req.block || (existingIdx >= 0 ? yardDb.containers[existingIdx].block : 'A'),
+                    bay: req.bay || (existingIdx >= 0 ? yardDb.containers[existingIdx].bay : 'BAY-1'),
+                    row: req.yard_row || (existingIdx >= 0 ? yardDb.containers[existingIdx].row : 'GROUND'),
+                    tier: req.tier || (existingIdx >= 0 ? yardDb.containers[existingIdx].tier : '1'),
+                    vanInAmount: Number(req.van_in_amount ?? (existingIdx >= 0 ? yardDb.containers[existingIdx].vanInAmount : 0) ?? 0),
                     vanInStats: 'PAID',
-                    vanOutAmount: 0,
-                    date: req.gate_in_date ? formatIsoToLocalDateTimeInput(req.gate_in_date) : formatIsoToLocalDateTimeInput(new Date().toISOString()),
-                    etaDate: req.eta_date ? formatIsoToLocalDateTimeInput(req.eta_date) : '',
-                    gateInToD: req.gate_in_tod || 'MORNING',
-                    remarks: req.remarks || '',
-                    photos: []
+                    vanOutAmount: existingIdx >= 0 ? Number(yardDb.containers[existingIdx].vanOutAmount || 0) : 0,
+                    date: req.gate_in_date
+                        ? formatIsoToLocalDateTimeInput(req.gate_in_date)
+                        : ((existingIdx >= 0 && yardDb.containers[existingIdx].date) ? yardDb.containers[existingIdx].date : formatIsoToLocalDateTimeInput(new Date().toISOString())),
+                    etaDate: req.eta_date
+                        ? formatIsoToLocalDateTimeInput(req.eta_date)
+                        : ((existingIdx >= 0 && yardDb.containers[existingIdx].etaDate) ? yardDb.containers[existingIdx].etaDate : ''),
+                    gateInToD: req.gate_in_tod || (existingIdx >= 0 ? yardDb.containers[existingIdx].gateInToD : 'MORNING'),
+                    remarks: req.remarks || (existingIdx >= 0 ? yardDb.containers[existingIdx].remarks : ''),
+                    photos: (existingIdx >= 0 && Array.isArray(yardDb.containers[existingIdx].photos)) ? yardDb.containers[existingIdx].photos : []
                 };
 
-                if (!Array.isArray(yardDb.containers)) yardDb.containers = [];
-                yardDb.containers.unshift(newContainer);
-                await syncYardContainerToSupabase(newContainer);
+                if (existingIdx >= 0) {
+                    yardDb.containers[existingIdx] = mergedContainer;
+                } else {
+                    yardDb.containers.unshift(mergedContainer);
+                }
+
+                await syncYardContainerToSupabase(mergedContainer);
                 await saveCloudData();
             }
 
@@ -9978,8 +10032,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const search = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').toLowerCase();
             const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
             const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
-            const isAdmin = currentUserRole === 'admin';
-            const canYardEdit = ['admin', 'yard_manager'].includes(currentUserRole);
+			const isAdmin = currentUserRole === 'admin';
+            const canYardEdit = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
 
             const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
             const containers = allContainers.filter(c => {
