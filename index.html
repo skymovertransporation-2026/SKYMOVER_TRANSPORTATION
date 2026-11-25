@@ -8164,17 +8164,30 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (e) {}
         }
 
-        async function insertMaintenanceLogToSupabase(maintRecord) {
+		async function insertMaintenanceLogToSupabase(maintRecord) {
             if (!supabaseClient) return false;
             try {
                 const { data, error } = await supabaseClient.from('maintenance_logs').insert({
-                    unit_id: maintRecord.unit, issue: maintRecord.issue, cost: parsePesoNumber(maintRecord.cost),
-                    status: maintRecord.status || 'In Shop', service_date: maintRecord.date || new Date().toISOString().substring(0, 10),
-                    attachments: maintRecord.attachments || [], logged_by: currentUser ? currentUser.email : 'system'
+                    unit_id: maintRecord.unit,
+                    issue: maintRecord.issue,
+                    cost: parsePesoNumber(maintRecord.cost),
+                    status: maintRecord.status || 'In Shop',
+                    service_date: maintRecord.date || new Date().toISOString().substring(0, 10),
+                    attachments: maintRecord.attachments || [],
+                    logged_by: currentUser ? currentUser.email : 'system'
                 }).select().single();
-                if (!error && data && data.id) maintRecord.id = data.id;
-                return !error;
-            } catch (e) { return false; }
+
+                if (error) {
+                    console.warn('insertMaintenanceLogToSupabase error:', error.message);
+                    alert('⚠️ Cloud sync warning for maintenance_logs: ' + error.message);
+                    return false;
+                }
+                if (data && data.id) maintRecord.id = data.id;
+                return true;
+            } catch (err) {
+                console.warn('insertMaintenanceLogToSupabase exception:', err.message || err);
+                return false;
+            }
         }
 
         async function updateMaintenanceLogInSupabase(recordId, maintRecord) {
