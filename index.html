@@ -579,9 +579,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     <div class="panel bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">TOTAL REVENUE (PAID)</div><div class="text-2xl font-bold my-1 text-emerald-700" id="dashTotalRev">₱0.00</div></div>
                 </div>
 
-                <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200">
+				<div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200">
                     <h3 class="font-bold text-base text-slate-900 mb-4">Recent Yard Movements</h3>
-                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Movement</th><th class="p-3">Container No.</th><th class="p-3">Plate No.</th><th class="p-3">EIR / Ref</th><th class="p-3">Amount</th></tr></thead><tbody id="yardRecentBody" class="divide-y divide-slate-200"></tbody></table></div>
+                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Movement</th><th class="p-3">Container No.</th><th class="p-3">Plate No.</th><th class="p-3">Equipment</th><th class="p-3">EIR / Ref</th><th class="p-3">Amount</th></tr></thead><tbody id="yardRecentBody" class="divide-y divide-slate-200"></tbody></table></div>
                 </div>
             </div>
 
@@ -593,8 +593,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <h3 class="font-bold text-base text-slate-900">Empty Container Master Inventory</h3>
                             <p class="text-xs text-slate-600">Real-time status, condition, and location tracking.</p>
                         </div>
-                        <div class="flex gap-2">
+						<div class="flex flex-wrap gap-2">
                             <input type="text" id="yardSearchInput" oninput="renderYardInventory()" placeholder="Search container no, line, plate..." class="p-2 border rounded-lg text-xs w-64 bg-slate-50 text-slate-900 font-medium">
+							<select id="yardInventoryEquipmentFilter" onchange="renderYardInventory()" class="p-2 border rounded-lg text-xs bg-slate-50 text-slate-900 font-semibold">
+                                <option value="">All Equipment</option>
+                                <option value="Crawler Crane">Crawler Crane</option>
+                                <option value="Boom Truck">Boom Truck</option>
+                                <option value="Mobile Crane">Mobile Crane</option>
+                                <option value="Forklift">Forklift</option>
+                            </select>
+                            <button type="button" onclick="resetYardInventoryFilters()" class="bg-slate-200 hover:bg-slate-300 px-3 py-2 rounded-lg text-xs font-semibold text-slate-800">Reset</button>
                             <button onclick="exportYardCSV()" class="bg-slate-200 hover:bg-slate-300 px-3 py-2 rounded-lg text-xs font-semibold text-slate-800">Export Inventory CSV</button>
                         </div>
                     </div>
@@ -605,6 +613,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                                     <th class="p-3">Container No.</th>
                                     <th class="p-3">Size / Type</th>
                                     <th class="p-3">Shipping Line</th>
+									<th class="p-3">Equipment</th>
                                     <th class="p-3">Status</th>
                                     <th class="p-3">Yard Location</th>
                                     <th class="p-3">Gate-In</th>
@@ -645,7 +654,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             </div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Truck Plate Number *</label><input name="plate" required class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Driver Name</label><input name="driver" class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
-                            <div><label class="font-bold text-slate-800 mb-1 block">EIR / Reference No.</label><input name="eir" class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
+							<div><label class="font-bold text-slate-800 mb-1 block">Equipment *</label><select name="equipment" id="gateInEquipment" required class="p-2 border rounded-lg w-full bg-white text-slate-900"><option value="">Select equipment</option><option value="Crawler Crane">Crawler Crane</option><option value="Boom Truck">Boom Truck</option><option value="Mobile Crane">Mobile Crane</option><option value="Forklift">Forklift</option></select></div>
+							<div><label class="font-bold text-slate-800 mb-1 block">EIR / Reference No.</label><input name="eir" class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Condition *</label><select name="condition" required class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>Good</option><option>Damaged</option><option>For Inspection</option></select></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Initial Status</label><select name="status" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>Available</option><option>Reserved</option><option>Hold</option><option>Pending</option></select></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Block</label><select name="block" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
@@ -717,7 +727,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <div><label class="font-bold text-slate-800 mb-1 block">Release To / Customer *</label><input name="customer" id="gateOutCustomer" required class="p-2 border rounded-lg w-full bg-white text-slate-900" placeholder="e.g. Acme Logistics Corp"></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Truck Plate Number *</label><input name="plate" id="gateOutPlate" required readonly class="p-2 border rounded-lg w-full bg-slate-100 text-slate-900 font-bold" placeholder="Reflected from Gate-In"></div>
                             <div><label class="font-bold text-slate-800 mb-1 block">Driver Name</label><input name="driver" id="gateOutDriver" readonly class="p-2 border rounded-lg w-full bg-slate-100 text-slate-900 font-bold" placeholder="Reflected from Gate-In"></div>
-                            <div><label class="font-bold text-slate-800 mb-1 block">Gate-Out EIR / Reference *</label><input name="eir" id="gateOutEir" required class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
+							<div><label class="font-bold text-slate-800 mb-1 block">Equipment *</label><select name="equipment" id="gateOutEquipment" required class="p-2 border rounded-lg w-full bg-white text-slate-900"><option value="">Select equipment</option><option value="Crawler Crane">Crawler Crane</option><option value="Boom Truck">Boom Truck</option><option value="Mobile Crane">Mobile Crane</option><option value="Forklift">Forklift</option></select></div>
+							<div><label class="font-bold text-slate-800 mb-1 block">Gate-Out EIR / Reference *</label><input name="eir" id="gateOutEir" required class="p-2 border rounded-lg w-full bg-white text-slate-900"></div>
 
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Van In Amount (₱)</label><input type="number" id="calcVanInAmount" name="vanInAmount" readonly class="p-2 border rounded-lg w-full bg-slate-100 font-bold text-slate-900" value="0"></div>
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Van Out Amount (₱)</label><input type="number" id="calcVanOutAmount" name="vanOutAmount" placeholder="0.00" class="p-2 border rounded-lg w-full bg-white text-slate-900 font-bold" oninput="recalculateTotals()"></div>
@@ -726,10 +737,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
  							<div class="gate-out-admin-only">
                                 <label class="font-bold text-slate-800 mb-1 block">Storage Amount Rate per Day (₱)</label>
                                 <select name="storageamount" id="calcStorageAmount" class="p-2 border rounded-lg w-full bg-white text-slate-900" onchange="recalculateTotals()">
-                                    <option value="300">300 (CTAP 20ft)</option>
-                                    <option value="400">400 (Regular 20ft)</option>
-                                    <option value="600">600 (CTAP 40ft)</option>
-                                    <option value="800">800 (Regular 40ft)</option>
+                                    <option value="300">300 (CTAP)</option>
+									<option value="400">400 (CTAP)</option>
+									<option value="500">500 (CTAP)</option>
+									<option value="600">600 (CTAP)</option>
+									<option value="800">800 (CTAP)</option>
+									<option value="1000">1000 (CTAP)</option>
+									<option value="1800">1800 (CTAP)</option>
+									<option value="300">300 (Regular)</option>
+									<option value="400">400 (Regular)</option>
+                                    <option value="500">500 (Regular)</option>
+									<option value="600">600 (Regular)</option>
+                                    <option value="800">800 (Regular)</option>
+									<option value="1000">1000 (Regular)</option>
+									<option value="1800">1800 (Regular)</option>
                                 </select>
                             </div>
 
@@ -778,7 +799,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <i class="fa-solid fa-filter text-sky-600"></i>
                         <span class="text-xs font-bold text-slate-800">Date Range Filter:</span>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 text-xs">
+					<div class="flex flex-wrap items-center gap-3 text-xs">
                         <div>
                             <label class="text-[10px] text-slate-600 font-bold mr-1">From:</label>
                             <input type="date" id="filterDateFrom" onchange="renderYardRevenue()" class="p-1.5 border rounded-lg bg-slate-50 font-semibold text-slate-900">
@@ -787,7 +808,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <label class="text-[10px] text-slate-600 font-bold mr-1">To:</label>
                             <input type="date" id="filterDateTo" onchange="renderYardRevenue()" class="p-1.5 border rounded-lg bg-slate-50 font-semibold text-slate-900">
                         </div>
-                        <button onclick="clearDateFilter()" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg font-semibold text-slate-800">Reset Filter</button>
+                        <div>
+                            <label class="text-[10px] text-slate-600 font-bold mr-1">Equipment:</label>
+                            <select id="filterRevenueEquipment" onchange="renderYardRevenue()" class="p-1.5 border rounded-lg bg-slate-50 font-semibold text-slate-900">
+                                <option value="">All Equipment</option>
+                                <option value="Crawler Crane">Crawler Crane</option>
+                                <option value="Boom Truck">Boom Truck</option>
+                                <option value="Mobile Crane">Mobile Crane</option>
+                                <option value="Forklift">Forklift</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="clearDateFilter()" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg font-semibold text-slate-800">Reset Filter</button>
                     </div>
                 </div>
 
@@ -860,7 +891,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </div>
                         <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold" onclick="exportRevenueCSV()">Export Revenue CSV</button>
                     </div>
-                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Source Type</th><th class="p-3">Container No.</th><th class="p-3">Reference / EIR</th><th class="p-3 text-right">Amount (₱)</th><th class="p-3 text-right">Actions (Admin)</th></tr></thead><tbody id="revenueTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Source Type</th><th class="p-3">Container No.</th><th class="p-3">Equipment</th><th class="p-3">Reference / EIR</th><th class="p-3 text-right">Amount (₱)</th><th class="p-3 text-right">Actions (Admin)</th></tr></thead><tbody id="revenueTableBody" class="divide-y divide-slate-200"></tbody></table></div>
                 </div>
             </div>
 
@@ -912,17 +943,26 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Shipping Line</th><th class="p-3">On-Hand</th><th class="p-3">Available</th><th class="p-3">Reserved</th><th class="p-3">Damaged / Hold</th></tr></thead><tbody id="yardLineRows" class="divide-y divide-slate-200"></tbody></table></div>
                 </div>
                 <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border">
-                    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+					<div class="flex flex-wrap justify-between items-center gap-4 mb-4">
                         <h3 class="font-bold text-base text-slate-900">Full Movement History & Billings (Gate-In to Gate-Out)</h3>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
+							<select id="yardReportsEquipmentFilter" onchange="syncEquipmentFilterValue(this.value, 'reports'); renderYardReports();" class="p-1.5 border rounded text-xs bg-slate-50 text-slate-900 font-semibold">
+                                <option value="">All Equipment</option>
+                                <option value="Crawler Crane">Crawler Crane</option>
+                                <option value="Boom Truck">Boom Truck</option>
+                                <option value="Mobile Crane">Mobile Crane</option>
+                                <option value="Forklift">Forklift</option>
+                            </select>
+                            <button type="button" onclick="syncEquipmentFilterValue('', 'both'); renderYardReports();" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded text-xs font-semibold text-slate-800">
+                                Reset Filter
+                            </button>
                             <button class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold shadow" onclick="openExtractionReport()">
                                 <i class="fa-solid fa-file-arrow-down mr-1"></i> Open Visual Extraction Report & Photo Audit
                             </button>
                             <button class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded text-xs font-semibold text-slate-800" onclick="exportYardMovements()">Export Movements CSV</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Movement</th><th class="p-3">Container No.</th><th class="p-3">Plate</th><th class="p-3">Storage Days</th><th class="p-3">Van In / Out</th><th class="p-3">Total Amount</th><th class="p-3">EIR / Ref.</th><th class="p-3 text-right">Actions (Admin)</th></tr></thead><tbody id="yardMovementRows" class="divide-y divide-slate-200"></tbody></table></div>
-                </div>
+					<div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-900 font-medium"><thead class="bg-slate-100 text-slate-800"><tr><th class="p-3">Date / Time</th><th class="p-3">Movement</th><th class="p-3">Container No.</th><th class="p-3">Plate</th><th class="p-3">Equipment</th><th class="p-3">Storage Days</th><th class="p-3">Van In / Out</th><th class="p-3">Total Amount</th><th class="p-3">EIR / Ref.</th><th class="p-3 text-right">Actions (Admin)</th></tr></thead><tbody id="yardMovementRows" class="divide-y divide-slate-200"></tbody></table></div>                </div>
             </div>
 
             <!-- Yard Tab 8: Cloud Sync & Backup -->
@@ -1386,6 +1426,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         let currentEditingHubIndex = null;
         let currentEditingReportTemplateIndex = null;
         let currentExtractionFilter = 'ALL';
+		let currentExtractionEquipmentFilter = '';
 
         // ==========================================
         // CLIENT-FACING QR ACCESS MODE & PORTAL SETTINGS SYNC
@@ -5480,7 +5521,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			} else if (moduleName === 'Empty Container Inventory') {
                 const gateOutMovements = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
                 csvRows = [
-                    ['Container No.', 'Size', 'Type', 'Shipping Line', 'Trucking Name', 'Truck Plate No.', 'Driver Name', 'EIR / Reference No.', 'Condition', 'Status', 'Block', 'Bay', 'Row', 'Tier', 'Gate-In Date & Time', 'ETA Arrival Date & Time', 'Gate-In Time of Day', 'Gate-Out Date & Time', 'ETA Pull-out Date & Time', 'Gate-Out Time of Day', 'Release Customer', 'Storage Fee Type', 'Storage Rate/Day (PHP)', 'Storage Days', 'Van In Amount (PHP)', 'Van In Payment Status', 'Van Out Amount (PHP)', 'Total Billed Amount (PHP)', 'Remarks', 'Gate-In Photos', 'Gate-Out Photos'],
+                    ['Container No.', 'Size', 'Type', 'Shipping Line', 'Trucking Name', 'Truck Plate No.', 'Driver Name', 'Equipment', 'EIR / Reference No.', 'Condition', 'Status', 'Block', 'Bay', 'Row', 'Tier', 'Gate-In Date & Time', 'ETA Arrival Date & Time', 'Gate-In Time of Day', 'Gate-Out Date & Time', 'ETA Pull-out Date & Time', 'Gate-Out Time of Day', 'Release Customer', 'Storage Fee Type', 'Storage Rate/Day (PHP)', 'Storage Days', 'Van In Amount (PHP)', 'Van In Payment Status', 'Van Out Amount (PHP)', 'Total Billed Amount (PHP)', 'Remarks', 'Gate-In Photos', 'Gate-Out Photos'],
                     ...(yardDb.containers || []).map(c => {
                         const numUpper = (c.number || '').trim().toUpperCase();
                         const gateInRemark = (c.remarks || '').trim();
@@ -5506,6 +5547,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             esc(c.truckingName || ''),
                             esc(c.plate || ''),
                             esc(c.driver || ''),
+							esc(c.equipment || c.gateOutEquipment || ''),
                             esc(c.eir || ''),
                             esc(c.condition || 'Good'),
                             esc(c.status || 'Available'),
@@ -5533,10 +5575,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         ];
                     })
                 ];
-            } else if (moduleName === 'Revenue & Billings') {
+			} else if (moduleName === 'Revenue & Billings') {
                 csvRows = [
-                    ['Date / Time', 'Source Type', 'Container No.', 'Reference / EIR', 'Amount (PHP)'],
-                    ...(yardDb.revenues || []).map(r => [esc(r.date), esc(r.source), esc(r.container), esc(r.eir), r.amount])
+                    ['Date / Time', 'Source Type', 'Container No.', 'Equipment', 'Reference / EIR', 'Amount (PHP)'],
+                    ...(yardDb.revenues || []).map(r => [
+                        esc(r.date),
+                        esc(r.source),
+                        esc(r.container),
+                        esc(typeof resolveRevenueEquipmentType === 'function' ? resolveRevenueEquipmentType(r) : (r.equipment || '')),
+                        esc(r.eir),
+                        r.amount
+                    ])
                 ];
             } else if (moduleName === 'Fleet Expenses') {
                 csvRows = [
@@ -5572,6 +5621,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const form = document.getElementById('yardGateInForm');
             if (form) {
                 form.reset();
+				const eqSelect = document.getElementById('gateInEquipment');
+                if (eqSelect) eqSelect.value = '';
                 const submitBtn = document.getElementById('saveGateInSubmitBtn') || form.querySelector('button[type="submit"]');
                 if (submitBtn) {
                     submitBtn.textContent = isClientQrMode ? 'Submit Gate-In Entry' : 'Save Gate-In Entry';
@@ -8267,6 +8318,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     container_type: m.type || null, shipping_line: m.line || null, trucking_name: m.truckingName || null,
                     truck_plate: m.plate || null, driver_name: m.driver || null, customer: m.customer || null,
                     eir_ref: m.eir || null, condition: m.condition || null, status: m.status || null,
+					equipment: m.equipment || null,
                     block: m.block || null, bay: m.bay || null, yard_row: m.row || null, tier: m.tier || null,
                     storage_fee_type: m.storageFeeType || null,
                     storage_rate: m.storageRate !== undefined && m.storageRate !== null && m.storageRate !== '' ? parseFloat(m.storageRate) : null,
@@ -8386,6 +8438,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             form.elements['truckingName'].value = target.truckingName || 'SKYMOVER';
             form.elements['plate'].value = target.plate || '';
             form.elements['driver'].value = target.driver || '';
+			if (form.elements['equipment']) form.elements['equipment'].value = target.equipment || '';
             form.elements['eir'].value = target.eir || '';
             form.elements['condition'].value = target.condition || 'Good';
             form.elements['status'].value = target.status || 'Available';
@@ -9193,12 +9246,49 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
         function closeSubModule() { document.getElementById('subModuleModal').classList.add('hidden'); }
 
-        function setExtractionReportFilter(filterMode) { currentExtractionFilter = filterMode; openExtractionReport(); }
+		function syncEquipmentFilterValue(equipVal, source = 'both') {
+            const cleanVal = String(equipVal ?? '').trim();
+            currentExtractionEquipmentFilter = cleanVal;
+
+            const reportsSelect = document.getElementById('yardReportsEquipmentFilter');
+            if (reportsSelect && source !== 'reports' && reportsSelect.value !== cleanVal) {
+                reportsSelect.value = cleanVal;
+            }
+
+            const modalSelect = document.getElementById('extractionEquipmentFilter');
+            if (modalSelect && source !== 'modal' && modalSelect.value !== cleanVal) {
+                modalSelect.value = cleanVal;
+            }
+        }
+
+		function setExtractionReportFilter(filterMode) { currentExtractionFilter = filterMode; openExtractionReport(); }
+        function setExtractionEquipmentFilter(equipVal) {
+            syncEquipmentFilterValue(equipVal, 'modal');
+            if (typeof renderYardReports === 'function') renderYardReports();
+            openExtractionReport();
+        }
+        function resetExtractionReportFilters() {
+            currentExtractionFilter = 'ALL';
+            syncEquipmentFilterValue('', 'both');
+            if (typeof renderYardReports === 'function') renderYardReports();
+            openExtractionReport();
+        }
 
 		function buildVisualExtractionSectionsHtml(filterMode) {
-            const allContainers = (yardDb.containers || []);
+            const modalEqEl = document.getElementById('extractionEquipmentFilter');
+            const reportsEqEl = document.getElementById('yardReportsEquipmentFilter');
+            const rawEq = (
+                (modalEqEl && typeof modalEqEl.value === 'string' && modalEqEl.value.trim()) ||
+                (typeof currentExtractionEquipmentFilter === 'string' && currentExtractionEquipmentFilter.trim()) ||
+                (reportsEqEl && typeof reportsEqEl.value === 'string' && reportsEqEl.value.trim()) ||
+                ''
+            );
+            const selectedEq = rawEq.trim().toLowerCase();
+            const matchesEq = (val) => !selectedEq || String(val || '').trim().toLowerCase() === selectedEq;
+
+            const allContainers = (yardDb.containers || []).filter(c => matchesEq(c.equipment || c.gateOutEquipment));
             const gateInContainers = allContainers;
-            const gateOutMovements = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT');
+            const gateOutMovements = (yardDb.movements || []).filter(m => m.kind === 'GATE-OUT' && matchesEq(m.equipment));
             const releasedContainers = allContainers.filter(c => c.status === 'Released');
 
             const showGateInSection = (filterMode === 'ALL' || filterMode === 'GATE-IN');
@@ -9209,7 +9299,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
                     <td class="p-2 font-mono font-bold text-sky-800">${escapeHtml(c.number)}</td>
                     <td class="p-2">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}<br><span class="text-[10px] text-slate-600">${escapeHtml(c.line)}</span></td>
-                    <td class="p-2">${escapeHtml(c.truckingName || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(c.plate || '—')} • ${escapeHtml(c.driver || 'No Driver')}</span></td>
+                    <td class="p-2">${escapeHtml(c.truckingName || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(c.plate || '—')} • ${escapeHtml(c.driver || 'No Driver')}</span><br><span class="text-[10px] font-bold text-slate-700">Eq: ${escapeHtml(c.equipment || '—')}</span></td>
                     <td class="p-2 font-mono text-[10px]">EIR: ${escapeHtml(c.eir || '—')}<br>${escapeHtml(c.block || 'A')}/${escapeHtml(c.bay || '1')}/${escapeHtml(c.row || 'GROUND')}/T${escapeHtml(c.tier || '1')}</td>
                     <td class="p-2">${escapeHtml(c.condition || 'Good')}<br><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900">${escapeHtml(c.status)}</span></td>
                     <td class="p-2 font-mono text-[10px]">In: ${c.date ? new Date(c.date).toLocaleString() : '—'} (${escapeHtml(c.gateInToD || '—')})<br>ETA: ${c.etaDate ? new Date(c.etaDate).toLocaleString() : '—'}</td>
@@ -9222,7 +9312,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const gateOutHtml = gateOutMovements.length ? gateOutMovements.map(m => `
                 <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
                     <td class="p-2 font-mono font-bold text-purple-800">${escapeHtml(m.container)}</td>
-                    <td class="p-2">${escapeHtml(m.customer || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(m.plate || '—')} • ${escapeHtml(m.driver || '—')}</span></td>
+                    <td class="p-2">${escapeHtml(m.customer || '—')}<br><span class="font-mono text-[10px]">${escapeHtml(m.plate || '—')} • ${escapeHtml(m.driver || '—')}</span><br><span class="text-[10px] font-bold text-slate-700">Eq: ${escapeHtml(m.equipment || '—')}</span></td>
                     <td class="p-2 font-mono text-[10px]">EIR: ${escapeHtml(m.eir || '—')}<br>${escapeHtml(m.storageFeeType || 'Dry Van')} @ ₱${Number(m.storageRate || 450)}/d</td>
                     <td class="p-2">${Number(m.storageDays || 0)} Days<br><span class="font-mono text-[10px]">In: ₱${Number(m.vanInAmount || 0)} | Out: ₱${Number(m.vanOutAmount || 0)}</span></td>
                     <td class="p-2 font-bold text-emerald-700">₱${Number(m.totalAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
@@ -9238,7 +9328,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 return `
                     <tr class="border-b font-medium text-slate-900 hover:bg-slate-50">
                         <td class="p-2 font-mono font-bold text-emerald-800">${escapeHtml(c.number)}<br><span class="text-[10px] text-slate-600">${escapeHtml(c.size)} / ${escapeHtml(c.line)}</span></td>
-                        <td class="p-2"><strong>Customer:</strong> ${escapeHtml(c.releaseCustomer || matchingOut.customer || '—')}<br><span class="font-mono text-[10px]">Trucking: ${escapeHtml(c.truckingName || '—')} | Plate: ${escapeHtml(c.plate || '—')}</span></td>
+                        <td class="p-2"><strong>Customer:</strong> ${escapeHtml(c.releaseCustomer || matchingOut.customer || '—')}<br><span class="font-mono text-[10px]">Trucking: ${escapeHtml(c.truckingName || '—')} | Plate: ${escapeHtml(c.plate || '—')}</span><br><span class="text-[10px] font-bold text-slate-700">Equipment: ${escapeHtml(matchingOut.equipment || c.gateOutEquipment || c.equipment || '—')}</span></td>
                         <td class="p-2 font-mono text-[10px]">In EIR: ${escapeHtml(c.eir || '—')}<br>Out EIR: ${escapeHtml(matchingOut.eir || '—')}</td>
                         <td class="p-2 font-mono text-[10px]">In: ${c.date ? new Date(c.date).toLocaleString() : '—'}<br>Out: ${c.gateOutDate ? new Date(c.gateOutDate).toLocaleString() : '—'}</td>
                         <td class="p-2 font-mono text-[10px]">${Number(c.storageDays || matchingOut.storageDays || 0)} Days</td>
@@ -9256,12 +9346,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             `;
         }
 
-        function openExtractionReport() {
+		function openExtractionReport() {
             const modal = document.getElementById('subModuleModal');
             const content = document.getElementById('subModuleContent');
             if(!modal || !content) return;
             modal.classList.remove('hidden');
 
+            const reportsSelect = document.getElementById('yardReportsEquipmentFilter');
+            if (!currentExtractionEquipmentFilter && reportsSelect && reportsSelect.value) {
+                currentExtractionEquipmentFilter = reportsSelect.value;
+            }
             const filterMode = currentExtractionFilter || 'ALL';
             const btnClass = (mode) => filterMode === mode ? 'bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700';
 
@@ -9275,23 +9369,34 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <button onclick="exportVisualExtractionExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold shadow">Export Excel (CSV)</button>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-xl mb-4">
+				<div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-xl mb-4">
                     <span class="text-xs text-slate-300 font-semibold">Filter Viewing Mode:</span>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <button type="button" onclick="setExtractionReportFilter('ALL')" class="${btnClass('ALL')}">All</button>
                         <button type="button" onclick="setExtractionReportFilter('GATE-IN')" class="${btnClass('GATE-IN')}">Gate-In</button>
                         <button type="button" onclick="setExtractionReportFilter('GATE-OUT')" class="${btnClass('GATE-OUT')}">Gate-Out</button>
                         <button type="button" onclick="setExtractionReportFilter('RELEASE')" class="${btnClass('RELEASE')}">Release</button>
+						<select id="extractionEquipmentFilter" onchange="setExtractionEquipmentFilter(this.value)" class="bg-slate-800 border border-slate-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
+                            <option value="" ${currentExtractionEquipmentFilter === '' ? 'selected' : ''}>All Equipment</option>
+                            <option value="Crawler Crane" ${currentExtractionEquipmentFilter === 'Crawler Crane' ? 'selected' : ''}>Crawler Crane</option>
+                            <option value="Boom Truck" ${currentExtractionEquipmentFilter === 'Boom Truck' ? 'selected' : ''}>Boom Truck</option>
+                            <option value="Mobile Crane" ${currentExtractionEquipmentFilter === 'Mobile Crane' ? 'selected' : ''}>Mobile Crane</option>
+                            <option value="Forklift" ${currentExtractionEquipmentFilter === 'Forklift' ? 'selected' : ''}>Forklift</option>
+                        </select>
+                        <button type="button" onclick="resetExtractionReportFilters()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-600 transition">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset Filters
+                        </button>
                     </div>
                 </div>
                 <div id="visualExtractionPrintableArea" class="space-y-6">
-                    ${buildVisualExtractionSectionsHtml(filterMode)}
+                    ${buildVisualExtractionSectionsHtml(filterMode, currentExtractionEquipmentFilter)}
                 </div>
             `;
         }
 
 		async function exportVisualExtractionPDF() {
             const filterMode = currentExtractionFilter || 'ALL';
+			const equipFilter = currentExtractionEquipmentFilter || '';
             const exportBtn = document.getElementById('exportVisualPdfBtn');
             if (exportBtn) {
                 exportBtn.disabled = true;
@@ -9311,15 +9416,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 14px;">
                     <div>
                         <h1 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0;">SKYMOVER TRANSPORTATION</h1>
-                        <p style="font-size: 11px; font-weight: 600; color: #475569; margin: 4px 0 0 0;">Visual Extraction Report &amp; Photo Audit • Active Filter: <span style="color: #0369a1; font-weight: 700;">${escapeHtml(filterMode)}</span></p>
+                        <p style="font-size: 11px; font-weight: 600; color: #475569; margin: 4px 0 0 0;">Visual Extraction Report &amp; Photo Audit • Active Filter: <span style="color: #0369a1; font-weight: 700;">${escapeHtml(filterMode)}</span> • Equipment: <span style="color: #0369a1; font-weight: 700;">${escapeHtml(equipFilter || 'All Equipment')}</span></p>
                     </div>
                     <div style="text-align: right; font-size: 10px; font-family: monospace; color: #475569; line-height: 1.4;">
                         Generated: ${escapeHtml(new Date().toLocaleString())}<br>
                         Complete Uncropped Filter Export
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    ${buildVisualExtractionSectionsHtml(filterMode)}
+				<div style="display: flex; flex-direction: column; gap: 16px;">
+                    ${buildVisualExtractionSectionsHtml(filterMode, equipFilter)}
                 </div>
                 <div style="margin-top: 16px; padding-top: 10px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8;">
                     © 2026 Skymover Transport Corporation • Visual Extraction &amp; Photo Audit Report
@@ -9481,6 +9586,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
                         <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
+						<td class="p-3 font-semibold">${escapeHtml(m.equipment || '—')}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
                         <td class="p-3 font-bold text-emerald-700">₱${Number(m.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     </tr>
@@ -9515,18 +9621,22 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		function renderYardInventory() {
             const tbody = document.getElementById('yardInventoryRows');
             if (!tbody) return;
-            const searchEl = document.getElementById('yardSearchInput');
+			const searchEl = document.getElementById('yardSearchInput');
             const search = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').toLowerCase();
+            const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
+            const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
             const isAdmin = currentUserRole === 'admin';
             const canYardEdit = ['admin', 'yard_manager'].includes(currentUserRole);
 
             const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
             const containers = allContainers.filter(c => {
+                const containerEq = String(c.equipment || c.gateOutEquipment || '').trim().toLowerCase();
+                if (selectedEq && containerEq !== selectedEq) return false;
                 if (!search) return true;
                 const num = String(c.number || '').toLowerCase();
                 const line = String(c.line || '').toLowerCase();
                 const plate = String(c.plate || '').toLowerCase();
-                return num.includes(search) || line.includes(search) || plate.includes(search);
+                return num.includes(search) || line.includes(search) || plate.includes(search) || containerEq.includes(search);
             });
 
             tbody.innerHTML = containers.length ? containers.map(c => {
@@ -9554,11 +9664,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     actionsHtml = `${acceptBtn} ${editBtn} ${deleteBtn}`;
                 }
 
+				const equipLabel = c.equipment || c.gateOutEquipment || '—';
 				return `
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(c.number)}</td>
                         <td class="p-3">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}</td>
                         <td class="p-3 font-bold">${escapeHtml(c.line)}</td>
+                        <td class="p-3 font-semibold text-slate-800">${escapeHtml(equipLabel)}</td>
                         <td class="p-3"><span class="pill ${escapeHtml(badgeClass)}">${escapeHtml(c.status)}</span></td>
                         <td class="p-3 font-mono text-xs">Block ${escapeHtml(c.block || 'A')}, Bay ${escapeHtml(c.bay || '1')} (${escapeHtml(c.row || 'GROUND')})</td>
                         <td class="p-3 font-mono text-[11px]">${c.date ? escapeHtml(new Date(c.date).toLocaleString()) : '—'}</td>
@@ -9567,7 +9679,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <td class="p-3 text-right space-x-1">${actionsHtml}</td>
                     </tr>
                 `;
-            }).join('') : '<tr><td colspan="9" class="p-4 text-center text-slate-500 font-medium">No container inventory records found.</td></tr>';
+            }).join('') : '<tr><td colspan="10" class="p-4 text-center text-slate-500 font-medium">No container inventory records found.</td></tr>';
         }
 
         async function deleteContainerEntry(idx) {
@@ -9617,6 +9729,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const submitBtn = document.getElementById('saveGateInSubmitBtn') || form.querySelector('button[type="submit"]');
             const formData = new FormData(form);
             const containerNo = formData.get('number').trim().toUpperCase();
+			const equipmentVal = (formData.get('equipment') || document.getElementById('gateInEquipment')?.value || '').trim();
 
             // CLIENT SELF-SERVICE PORTAL: DIRECT SAVE TO SUPABASE FOR IMMEDIATE YARD PERSONNEL REVIEW
 			if (isClientQrMode) {
@@ -9644,6 +9757,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                trucking_name: (formData.get('truckingName') || '').trim(),
 			                truck_plate_number: (formData.get('plate') || '').trim().toUpperCase(),
 			                driver_name: (formData.get('driver') || '').trim(),
+							equipment: equipmentVal || null,
 			                eir_ref: (formData.get('eir') || '').trim(),
 			                condition: formData.get('condition') || 'Good',
 			                block: formData.get('block') || 'A',
@@ -9674,6 +9788,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                truckingName: requestPayload.trucking_name,
 			                plate: requestPayload.truck_plate_number,
 			                driver: requestPayload.driver_name,
+							equipment: equipmentVal,
 			                eir: requestPayload.eir_ref,
 			                condition: requestPayload.condition,
 			                status: 'Pending Review',
@@ -9732,6 +9847,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     truckingName: formData.get('truckingName'),
                     plate: formData.get('plate').trim().toUpperCase(),
                     driver: formData.get('driver'),
+					equipment: equipmentVal,
                     eir: formData.get('eir'),
                     condition: formData.get('condition'),
                     status: formData.get('status'),
@@ -9771,6 +9887,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     truckingName: formData.get('truckingName'),
                     plate: formData.get('plate').trim().toUpperCase(),
                     driver: formData.get('driver'),
+					equipment: equipmentVal,
                     eir: formData.get('eir'),
                     condition: formData.get('condition'),
                     status: formData.get('status'),
@@ -9796,6 +9913,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     kind: 'GATE-IN', container: containerData.number, size: containerData.size, type: containerData.type,
                     line: containerData.line, truckingName: containerData.truckingName, plate: containerData.plate,
                     driver: containerData.driver, eir: containerData.eir, condition: containerData.condition,
+					equipment: containerData.equipment,
                     status: containerData.status, block: containerData.block, bay: containerData.bay,
                     row: containerData.row, tier: containerData.tier, vanInAmount: containerData.vanInAmount,
                     vanInStats: containerData.vanInStats, remarks: containerData.remarks,
@@ -9925,12 +10043,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			        const customer = (document.getElementById('gateOutCustomer')?.value || '').trim();
 			        const plate = (document.getElementById('gateOutPlate')?.value || '').trim().toUpperCase();
 			        const driver = (document.getElementById('gateOutDriver')?.value || '').trim();
+					const equipment = (document.getElementById('gateOutEquipment')?.value || '').trim();
 			        const eirRef = (document.getElementById('gateOutEir')?.value || '').trim();
 			        const etaPulloutDate = document.getElementById('gateOutETADateInput')?.value || '';
 			        const gateOutToD = document.getElementById('gateOutToD')?.value || 'MORNING';
 			        const remarks = (document.getElementById('gateOutRemarks')?.value || '').trim();
 			
-			        if (!containerNo || !customer || !plate || !eirRef || !etaPulloutDate) {
+			        if (!containerNo || !customer || !plate || !equipment || !eirRef || !etaPulloutDate) {
 			            showSkymoverNotice('Please complete all required Gate-Out fields marked with *.', 'warning');
 			            return;
 			        }
@@ -9947,6 +10066,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                release_to_customer: customer,
 			                truck_plate_number: plate,
 			                driver_name: driver,
+							equipment: equipment,
 			                gate_out_eir_ref: eirRef,
 			                eta_pullout_datetime: new Date(etaPulloutDate).toISOString(),
 			                gate_out_time_of_day: gateOutToD,
@@ -9989,6 +10109,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             const formData = new FormData(form);
             const gateOutDate = formData.get('date');
+			const gateOutEquipment = (formData.get('equipment') || document.getElementById('gateOutEquipment')?.value || '').trim();
             const etaPulloutDate = formData.get('etaPulloutDate') || '';
             const gateOutToD = formData.get('gateOutToD') || 'MORNING';
             const customer = formData.get('customer') || '';
@@ -10005,6 +10126,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             match.etaPulloutDate = etaPulloutDate;
             match.gateOutToD = gateOutToD;
             match.releaseCustomer = customer;
+			match.gateOutEquipment = gateOutEquipment;
+			match.equipment = gateOutEquipment || match.equipment || '';
             match.storageFeeType = storageFeeType;
             match.storageRate = storageRate;
             match.storageDays = storageDays;
@@ -10018,6 +10141,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 date: gateOutDate, etaPulloutDate: etaPulloutDate, gateOutToD: gateOutToD,
                 kind: 'GATE-OUT', container: containerNo, customer: customer, plate: match.plate,
                 driver: match.driver || '', eir: eirRef, storageFeeType: storageFeeType,
+				equipment: gateOutEquipment,
                 storageRate: storageRate, storageDays: storageDays, vanInAmount: match.vanInAmount || 0,
                 vanOutAmount: vanOutAmount, totalAmount: totalAmount, amount: totalAmount,
                 remarks: remarks, photos: stagedGateOutPhotos
@@ -10064,20 +10188,72 @@ Skymover Transport is not liable for charges incurred due to operational constra
             alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
         }
 
+		function resolveRevenueEquipmentType(revRow) {
+            if (!revRow) return '';
+            if (revRow.equipment) return String(revRow.equipment).trim();
+
+            const revContainer = String(revRow.container || '').trim().toUpperCase();
+            const revEir = String(revRow.eir || '').trim().toLowerCase();
+            const isGateOutSource = String(revRow.source || '').toLowerCase().includes('gate-out');
+            const preferredKind = isGateOutSource ? 'GATE-OUT' : 'GATE-IN';
+
+            const movements = Array.isArray(yardDb.movements) ? yardDb.movements : [];
+            const matchedMovement =
+                movements.find(m =>
+                    String(m.container || '').trim().toUpperCase() === revContainer &&
+                    String(m.kind || '').toUpperCase() === preferredKind &&
+                    m.equipment
+                ) ||
+                (revEir && revEir !== '—'
+                    ? movements.find(m =>
+                        String(m.eir || '').trim().toLowerCase() === revEir &&
+                        m.equipment
+                    )
+                    : null) ||
+                movements.find(m =>
+                    String(m.container || '').trim().toUpperCase() === revContainer &&
+                    m.equipment
+                );
+
+            if (matchedMovement && matchedMovement.equipment) {
+                return String(matchedMovement.equipment).trim();
+            }
+
+            const containers = Array.isArray(yardDb.containers) ? yardDb.containers : [];
+            const matchedContainer = containers.find(c =>
+                String(c.number || '').trim().toUpperCase() === revContainer &&
+                (c.equipment || c.gateOutEquipment)
+            );
+            if (matchedContainer) {
+                return String(matchedContainer.equipment || matchedContainer.gateOutEquipment || '').trim();
+            }
+
+            return '';
+        }
+		
 		function renderYardRevenue() {
             const tbody = document.getElementById('revenueTableBody');
             if (!tbody) return;
             const dateFromEl = document.getElementById('filterDateFrom');
             const dateToEl = document.getElementById('filterDateTo');
+            const eqFilterEl = document.getElementById('filterRevenueEquipment');
             const dateFrom = dateFromEl ? dateFromEl.value : '';
             const dateTo = dateToEl ? dateToEl.value : '';
+            const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
             const isAdmin = currentUserRole === 'admin';
 
-            let revs = (yardDb.revenues || []).map((r, idx) => ({ ...r, originalIdx: idx }));
+            let revs = (yardDb.revenues || []).map((r, idx) => ({
+                ...r,
+                resolvedEquipment: typeof resolveRevenueEquipmentType === 'function' ? resolveRevenueEquipmentType(r) : (r.equipment || ''),
+                originalIdx: idx
+            }));
             if (dateFrom) revs = revs.filter(r => r.date && r.date.substring(0, 10) >= dateFrom);
             if (dateTo) revs = revs.filter(r => r.date && r.date.substring(0, 10) <= dateTo);
+            if (selectedEq) {
+                revs = revs.filter(r => String(r.resolvedEquipment || '').trim().toLowerCase() === selectedEq);
+            }
 
-            let totalRev = 0;
+			let totalRev = 0;
             tbody.innerHTML = revs.length ? revs.map(r => {
                 totalRev += Number(r.amount || 0);
                 return `
@@ -10085,6 +10261,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         <td class="p-3 font-mono text-[11px]">${r.date ? escapeHtml(new Date(r.date).toLocaleString()) : '—'}</td>
                         <td class="p-3 font-semibold">${escapeHtml(r.source)}</td>
                         <td class="p-3 font-mono font-bold">${escapeHtml(r.container)}</td>
+                        <td class="p-3 font-semibold text-slate-800">${escapeHtml(r.resolvedEquipment || '—')}</td>
                         <td class="p-3 font-mono">${escapeHtml(r.eir)}</td>
                         <td class="p-3 text-right font-extrabold text-emerald-700">₱${Number(r.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 text-right space-x-1">
@@ -10093,8 +10270,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         </td>
                     </tr>
                 `;
-            }).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500">No revenue records found for selected filter.</td></tr>';
-
+            }).join('') : '<tr><td colspan="7" class="p-4 text-center text-slate-500">No revenue records found for selected filter.</td></tr>';
+			
             if(document.getElementById('totalRevenueDisplay')) document.getElementById('totalRevenueDisplay').innerText = '₱' + totalRev.toLocaleString('en-US', {minimumFractionDigits: 2});
 
             let totalExp = 0;
@@ -10115,6 +10292,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         function clearDateFilter() {
 			const fromEl = document.getElementById('filterDateFrom');
 		    const toEl = document.getElementById('filterDateTo');
+			const eqFilterEl = document.getElementById('filterRevenueEquipment');
 		    if (fromEl) fromEl.value = '';
 		    if (toEl) toEl.value = '';
             renderYardRevenue();
@@ -10442,26 +10620,62 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 `).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500">No shipping line inventory data.</td></tr>';
             }
 
+			const eqFilterEl = document.getElementById('yardReportsEquipmentFilter');
+            const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
+            const indexedMovements = movements.map((m, idx) => ({ ...m, originalIdx: idx }));
+            const filteredMovements = selectedEq
+                ? indexedMovements.filter(m => String(m.equipment || '').trim().toLowerCase() === selectedEq)
+                : indexedMovements;
+
             const movementRows = document.getElementById('yardMovementRows');
             if (movementRows) {
-                movementRows.innerHTML = movements.length ? movements.map((m, idx) => `
+                movementRows.innerHTML = filteredMovements.length ? filteredMovements.map((m) => `
                     <tr class="border-b hover:bg-slate-50">
                         <td class="p-3 font-mono text-[11px]">${m.date ? escapeHtml(new Date(m.date).toLocaleString()) : '—'}</td>
                         <td class="p-3 font-bold ${m.kind === 'GATE-IN' ? 'text-sky-700' : 'text-purple-700'}">${escapeHtml(m.kind)}</td>
                         <td class="p-3 font-mono font-bold">${escapeHtml(m.container)}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.plate || '—')}</td>
+						<td class="p-3 font-semibold">${escapeHtml(m.equipment || '—')}</td>
                         <td class="p-3 font-mono">${m.storageDays !== undefined && m.storageDays !== null && m.storageDays !== '' ? escapeHtml(m.storageDays) : '—'}</td>
                         <td class="p-3 font-mono">₱${Number(m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 font-extrabold text-emerald-700">₱${Number(m.totalAmount || m.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td class="p-3 font-mono">${escapeHtml(m.eir || '—')}</td>
-                        <td class="p-3 text-right">${isAdmin ? `<button onclick="deleteYardMovementEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}</td>
+                        <td class="p-3 text-right">${isAdmin ? `<button onclick="deleteYardMovementEntry(${Number(m.originalIdx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>` : '<span class="text-[10px] text-slate-400">Read Only</span>'}</td>
                     </tr>
-                `).join('') : '<tr><td colspan="9" class="p-4 text-center text-slate-500">No movement history logged.</td></tr>';
+                `).join('') : '<tr><td colspan="10" class="p-4 text-center text-slate-500">No matching movement history logged.</td></tr>';
             }
         }
 
-        function exportYardCSV() { generateModuleExcelReport('Empty Container Inventory'); }
-        function exportRevenueCSV() { generateModuleExcelReport('Revenue & Billings'); }
+		function resetYardInventoryFilters() {
+            const searchEl = document.getElementById('yardSearchInput');
+            const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
+            if (searchEl) searchEl.value = '';
+            if (eqFilterEl) eqFilterEl.value = '';
+            renderYardInventory();
+        }
+		
+		function exportYardCSV() { generateModuleExcelReport('Empty Container Inventory'); }
+        function exportRevenueCSV() {
+            if (!requireAdminExecution("export Yard Revenue CSV")) return;
+            const esc = (v) => `"${String(v !== undefined && v !== null ? v : '').replace(/"/g, '""')}"`;
+            const csvRows = [
+                ['Date / Time', 'Source Type', 'Container No.', 'Equipment', 'Reference / EIR', 'Amount (PHP)'],
+                ...(yardDb.revenues || []).map(r => [
+                    esc(r.date || ''),
+                    esc(r.source || ''),
+                    esc(r.container || ''),
+                    esc(typeof resolveRevenueEquipmentType === 'function' ? resolveRevenueEquipmentType(r) : (r.equipment || '')),
+                    esc(r.eir || ''),
+                    r.amount ?? 0
+                ])
+            ];
+            let link = document.createElement("a");
+            link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n")));
+            link.setAttribute("download", "Skymover_Yard_Revenue_" + new Date().toISOString().slice(0, 10) + ".csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
 
         function exportExpensesCSV() {
             if (!requireAdminExecution("export Yard Expenses CSV")) return;
@@ -10480,11 +10694,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
         function exportYardMovements() {
             if (!requireAdminExecution("export Yard Movements CSV")) return;
             const esc = (v) => `"${String(v !== undefined && v !== null ? v : '').replace(/"/g, '""')}"`;
-            const csvRows = [
-                ['Date / Time', 'Movement', 'Container No.', 'Size', 'Type', 'Shipping Line', 'Trucking Name', 'Plate', 'Driver', 'Release Customer', 'Storage Fee Type', 'Storage Rate/Day (PHP)', 'Storage Days', 'Van In Amount (PHP)', 'Van Out Amount (PHP)', 'Total Amount (PHP)', 'EIR / Ref', 'Time of Day', 'ETA Date', 'Remarks'],
+			const csvRows = [
+                ['Date / Time', 'Movement', 'Container No.', 'Size', 'Type', 'Shipping Line', 'Trucking Name', 'Plate', 'Equipment', 'Driver', 'Release Customer', 'Storage Fee Type', 'Storage Rate/Day (PHP)', 'Storage Days', 'Van In Amount (PHP)', 'Van Out Amount (PHP)', 'Total Amount (PHP)', 'EIR / Ref', 'Time of Day', 'ETA Date', 'Remarks'],
                 ...(yardDb.movements || []).map(m => [
                     esc(m.date || ''), esc(m.kind || ''), esc(m.container || ''), esc(m.size || ''), esc(m.type || ''),
-                    esc(m.line || ''), esc(m.truckingName || ''), esc(m.plate || ''), esc(m.driver || ''), esc(m.customer || ''),
+                    esc(m.line || ''), esc(m.truckingName || ''), esc(m.plate || ''), esc(m.equipment || ''), esc(m.driver || ''), esc(m.customer || ''),
+					
                     esc(m.storageFeeType || ''), m.storageRate || '', m.storageDays || '',
                     m.vanInAmount !== undefined ? m.vanInAmount : (m.kind === 'GATE-IN' ? (m.amount || 0) : 0),
                     m.vanOutAmount || 0, m.totalAmount || m.amount || 0, esc(m.eir || ''),
