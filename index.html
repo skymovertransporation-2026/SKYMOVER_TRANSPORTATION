@@ -8167,9 +8167,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		async function insertMaintenanceLogToSupabase(maintRecord) {
             if (!supabaseClient) return false;
             try {
+                const issueText = maintRecord.issue || maintRecord.issue_description || '';
                 const { data, error } = await supabaseClient.from('maintenance_logs').insert({
                     unit_id: maintRecord.unit,
-                    issue: maintRecord.issue,
+                    issue: issueText,
+                    issue_description: issueText,
                     cost: parsePesoNumber(maintRecord.cost),
                     status: maintRecord.status || 'In Shop',
                     service_date: maintRecord.date || new Date().toISOString().substring(0, 10),
@@ -8190,16 +8192,21 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        async function updateMaintenanceLogInSupabase(recordId, maintRecord) {
+		async function updateMaintenanceLogInSupabase(recordId, maintRecord) {
             if (!supabaseClient || !recordId) return false;
             try {
+                const issueText = maintRecord.issue || maintRecord.issue_description || '';
                 const { error } = await supabaseClient.from('maintenance_logs').update({
-                    unit_id: maintRecord.unit, issue: maintRecord.issue, cost: parsePesoNumber(maintRecord.cost),
-                    status: maintRecord.status || 'In Shop', attachments: maintRecord.attachments || [],
+                    unit_id: maintRecord.unit,
+                    issue: issueText,
+                    issue_description: issueText,
+                    cost: parsePesoNumber(maintRecord.cost),
+                    status: maintRecord.status || 'In Shop',
+                    attachments: maintRecord.attachments || [],
                     updated_at: new Date().toISOString()
                 }).eq('id', recordId);
                 return !error;
-            } catch (e) { return false; }
+            } catch (err) { return false; }
         }
 
         async function deleteMaintenanceLogFromSupabase(recordId) {
