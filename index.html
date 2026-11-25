@@ -767,24 +767,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Van Out Amount (₱)</label><input type="number" id="calcVanOutAmount" name="vanOutAmount" placeholder="0.00" class="p-2 border rounded-lg w-full bg-white text-slate-900 font-bold" oninput="recalculateTotals()"></div>
 
                             <div class="gate-out-admin-only"><label class="font-bold text-slate-800 mb-1 block">Storage Fee Type</label><select name="fee" class="p-2 border rounded-lg w-full bg-white text-slate-900"><option>Dry Van</option><option>Reefer Van</option><option>Flat Rack</option><option>Open Top</option></select></div>
- 							<div class="gate-out-admin-only">
+							<div class="gate-out-admin-only">
                                 <label class="font-bold text-slate-800 mb-1 block">Storage Amount Rate per Day (₱)</label>
                                 <select name="storageamount" id="calcStorageAmount" class="p-2 border rounded-lg w-full bg-white text-slate-900" onchange="recalculateTotals()">
 									<option value="">Select storage amount per day</option>
-									<option value="300">300 (CTAP)</option>
-									<option value="400">400 (CTAP)</option>
-									<option value="500">500 (CTAP)</option>
-									<option value="600">600 (CTAP)</option>
-									<option value="800">800 (CTAP)</option>
-									<option value="1000">1000 (CTAP)</option>
-									<option value="1800">1800 (CTAP)</option>
-									<option value="300">300 (Regular)</option>
-									<option value="400">400 (Regular)</option>
-                                    <option value="500">500 (Regular)</option>
-									<option value="600">600 (Regular)</option>
-                                    <option value="800">800 (Regular)</option>
-									<option value="1000">1000 (Regular)</option>
-									<option value="1800">1800 (Regular)</option>
+									<option value="300">₱300 / day</option>
+									<option value="400">₱400 / day</option>
+									<option value="500">₱500 / day</option>
+									<option value="600">₱600 / day</option>
+									<option value="800">₱800 / day</option>
+									<option value="1000">₱1,000 / day</option>
+									<option value="1800">₱1,800 / day</option>
                                 </select>
                             </div>
 
@@ -1442,8 +1435,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         let stagedGateOutPhotos = [];
         let stagedDriverAttachments = [];
         let stagedBackendAttachments = [];
-        let stagedDriverProofPhotos = [];
-        let trendChartInstance = null;
+		let stagedDriverProofPhotos = [];
         let yardPieChartInstance = null;
         let yardBarChartInstance = null;
         let forecastChartInstance = null;
