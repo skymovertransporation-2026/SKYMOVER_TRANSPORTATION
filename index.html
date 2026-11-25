@@ -8338,8 +8338,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     updated_at: new Date().toISOString()
                 };
 
-                if (c.id) {
-                    await supabaseClient.from('yard_containers').update(payload).eq('id', c.id);
+					if (c.id) {
+                    const { data: updatedRows, error: updErr } = await supabaseClient
+                        .from('yard_containers')
+                        .update(payload)
+                        .eq('id', c.id)
+                        .select('id, status');
+                    if (updErr) {
+                        console.warn('syncYardContainerToSupabase update failed (check RLS UPDATE policy on yard_containers):', updErr.message);
+                        return false;
+                    }
+                    if (!updatedRows || updatedRows.length === 0) {
+                        console.warn('syncYardContainerToSupabase update matched 0 rows (check RLS or id):', c.id);
+                        return false;
+                    }
 				} else if (isClientQrMode) {
                     await supabaseClient.from('yard_containers').insert(payload);
                 } else {
@@ -10063,6 +10075,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 else if (c.status === 'Pending') badgeClass = 'Pending';
                 else if (c.status === 'Pending Gate-Out') badgeClass = 'Pending-Gate-Out';
                 else if (c.status === 'Released') badgeClass = 'Released';
+                else if (c.status) badgeClass = String(c.status).trim().replace(/\s+/g, '-');
 
                 const isReleased = c.status === 'Released';
                 const isPending = c.status === 'Pending';
