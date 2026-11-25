@@ -2744,19 +2744,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 let addedCount = 0;
                 let skippedCount = 0;
 
+				const newHubRecords = [];
                 for (const preset of presetPhilippineHubs) {
-                    if (existingNames.has(preset.name.toLowerCase())) {
+                    const key = preset.name.toLowerCase();
+                    if (existingNames.has(key)) {
                         skippedCount++;
                         continue;
                     }
                     const hubRecord = { ...preset, updatedAt: new Date().toISOString() };
-                    await syncHubLocationToSupabase(hubRecord);
                     db.hubLocations.push(hubRecord);
-                    existingNames.add(preset.name.toLowerCase());
+                    newHubRecords.push(hubRecord);
+                    existingNames.add(key);
                     addedCount++;
                 }
 
-                await saveCloudData();
+                if (newHubRecords.length > 0) {
+                    await Promise.allSettled(newHubRecords.map(rec => syncHubLocationToSupabase(rec)));
+                    await saveCloudData();
+                }
+
                 refreshHubDatalist();
 
                 if (currentBackendModuleType === 'Hub Locations') {
