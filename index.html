@@ -4263,13 +4263,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 return;
             }
 
-            const randomZone = zones[Math.floor(Math.random() * zones.length)];
+			const randomZone = zones[Math.floor(Math.random() * zones.length)];
             const randomUnit = registeredUnits[Math.floor(Math.random() * registeredUnits.length)].id;
             const alertMsg = `[GEOFENCE ALERT] Registered unit ${randomUnit} crossed boundary: ${randomZone.name} at ${new Date().toLocaleTimeString()}`;
 
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            const validZoneUuid = (typeof randomZone.id === 'string' && uuidRegex.test(randomZone.id.trim()))
+                ? randomZone.id.trim()
+                : null;
+
             await insertGeofenceAlertToSupabase({
                 unitId: randomUnit,
-                zoneId: randomZone.id || null,
+                zoneId: validZoneUuid,
                 alertType: 'GEOFENCE_BREACH',
                 message: alertMsg,
                 lat: parseFloat(randomZone.lat) || 0,
