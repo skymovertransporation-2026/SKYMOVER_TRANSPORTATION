@@ -9887,11 +9887,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function renderClientGateNotificationsTable() {
+		function renderClientGateNotificationsTable() {
             const tbody = document.getElementById('clientGateNotificationsBody');
             if (!tbody) return;
 
-            const canReview = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
+            const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
             if (!pendingClientGateNotifications.length) {
                 tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>';
                 return;
@@ -9926,8 +9926,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }).join('');
         }
 
+		function canReviewClientQrSubmissions() {
+            if (isClientQrMode) return false;
+            if (!['admin', 'yard_manager'].includes(currentUserRole)) {
+                alert(`⛔ RBAC Access Denied: Only an Administrator or Yard Manager can accept or reject Pending Client QR Submissions.`);
+                return false;
+            }
+            return true;
+        }
+
 		async function acceptClientGateNotification(idx) {
-            if (!requireYardOperationExecution("accept a Client QR submission")) return;
+            if (!canReviewClientQrSubmissions()) return;
             const req = pendingClientGateNotifications[idx];
             if (!req) return;
 
@@ -9999,8 +10008,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
             showSkymoverNotice(`Accepted ${containerNo} from Client QR queue.`, 'success');
         }
 
-        async function rejectClientGateNotification(idx) {
-            if (!requireYardOperationExecution("reject a Client QR submission")) return;
+		async function rejectClientGateNotification(idx) {
+            if (!canReviewClientQrSubmissions()) return;
             const req = pendingClientGateNotifications[idx];
             if (!req) return;
 
@@ -10034,6 +10043,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
 			const isAdmin = currentUserRole === 'admin';
             const canYardEdit = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
+            const canAcceptPending = ['admin', 'yard_manager'].includes(currentUserRole);
 
             const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
             const containers = allContainers.filter(c => {
@@ -10059,9 +10069,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 let actionsHtml = '<span class="text-[10px] text-slate-400">Read Only</span>';
                 if (isReleased) {
                     actionsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><i class="fa-solid fa-lock text-[9px]"></i> Locked (Released)</span>`;
-                } else if (canYardEdit) {
+				} else if (canYardEdit) {
                     const idx = Number(c.originalIdx);
-                    const acceptBtn = isPending
+                    const acceptBtn = (isPending && canAcceptPending)
                         ? `<button onclick="acceptPendingContainerEntry(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>`
                         : '';
                     const editBtn = `<button onclick="editContainerEntry(${idx})" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-bold text-[10px]">Edit</button>`;
