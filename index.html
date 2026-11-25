@@ -10077,21 +10077,21 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 else if (c.status === 'Released') badgeClass = 'Released';
                 else if (c.status) badgeClass = String(c.status).trim().replace(/\s+/g, '-');
 
-                const isReleased = c.status === 'Released';
+				const isReleased = c.status === 'Released';
                 const isPending = c.status === 'Pending';
                 const isPendingGateOut = c.status === 'Pending Gate-Out';
+                const idx = Number(c.originalIdx);
+                const viewBtn = `<button type="button" onclick="openMergedContainerDetailsModal(${idx})" class="bg-sky-100 hover:bg-sky-200 text-sky-900 px-2.5 py-1 rounded font-bold text-[10px]">View</button>`;
 
-                let actionsHtml = '<span class="text-[10px] text-slate-400">Read Only</span>';
+                let actionsHtml = viewBtn;
                 if (isReleased) {
-                    actionsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><i class="fa-solid fa-lock text-[9px]"></i> Locked (Released)</span>`;
+                    actionsHtml = `${viewBtn} <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><i class="fa-solid fa-lock text-[9px]"></i> Locked (Released)</span>`;
 				} else if (isPendingGateOut) {
-                    const idx = Number(c.originalIdx);
                     actionsHtml = canAcceptPending
-                        ? `<button onclick="acceptDispatcherGateOut(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>
+                        ? `${viewBtn} <button onclick="acceptDispatcherGateOut(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>
                            <button onclick="rejectDispatcherGateOut(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Reject</button>`
-                        : '<span class="text-[10px] text-amber-700 font-semibold">Awaiting Yard Manager</span>';
+                        : `${viewBtn} <span class="text-[10px] text-amber-700 font-semibold">Awaiting Yard Manager</span>`;
 				} else if (canYardEdit) {
-                    const idx = Number(c.originalIdx);
                     const acceptBtn = (isPending && canAcceptPending)
                         ? `<button onclick="acceptPendingContainerEntry(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>`
                         : '';
@@ -10099,7 +10099,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     const deleteBtn = isAdmin
                         ? `<button onclick="deleteContainerEntry(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Delete</button>`
                         : '';
-                    actionsHtml = `${acceptBtn} ${editBtn} ${deleteBtn}`;
+                    actionsHtml = `${viewBtn} ${acceptBtn} ${editBtn} ${deleteBtn}`;
                 }
 
 				const equipLabel = c.equipment || c.gateOutEquipment || '—';
@@ -10754,13 +10754,178 @@ Skymover Transport is not liable for charges incurred due to operational constra
             );
             if (!ok) return;
 
-            delete target.pendingGateOut;
+		delete target.pendingGateOut;
             target.status = 'Available';
             await syncYardContainerToSupabase(target);
             await saveCloudData();
             refreshYard();
             populateYardOutContainerDropdown();
             showSkymoverNotice(`Gate-Out confirmation for ${target.number} rejected; status returned to Available.`, 'warning');
+        }
+
+        function openMergedContainerDetailsModal(index) {
+            const container = (yardDb.containers || [])[index];
+            if (!container) {
+                showSkymoverNotice('Container record not found.', 'warning');
+                return;
+            }
+
+            const modal = document.getElementById('subModuleModal');
+            const content = document.getElementById('subModuleContent');
+            if (!modal || !content) return;
+
+            const cleanNo = String(container.number || '').trim().toUpperCase();
+            const movements = Array.isArray(yardDb.movements) ? yardDb.movements : [];
+            const matchingMovements = movements.filter(
+                m => String(m.container || '').trim().toUpperCase() === cleanNo
+            );
+            const gateInMove = matchingMovements.find(m => String(m.kind || '').toUpperCase() === 'GATE-IN') || null;
+            const gateOutMove = matchingMovements.find(m => String(m.kind || '').toUpperCase() === 'GATE-OUT') || null;
+            const pendingOut = container.pendingGateOut || {};
+
+            const fmtDt = (val) => {
+                if (!val) return '—';
+                const d = new Date(val);
+                return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+            };
+            const fmtPeso = (val) => {
+                if (val === undefined || val === null || val === '') return '—';
+                const num = Number(val);
+                return isNaN(num) ? String(val) : `₱${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            const gateInDate = container.date || gateInMove?.date || '';
+            const etaInDate = container.etaDate || gateInMove?.etaDate || '';
+            const gateInToD = container.gateInToD || gateInMove?.gateInToD || '—';
+            const truckingName = container.truckingName || gateInMove?.truckingName || '—';
+            const gateInPlate = container.plate || gateInMove?.plate || '—';
+            const gateInDriver = container.driver || gateInMove?.driver || '—';
+            const gateInEquip = container.equipment || gateInMove?.equipment || '—';
+            const gateInEir = container.eir || gateInMove?.eir || '—';
+            const vanInAmount = container.vanInAmount ?? gateInMove?.vanInAmount ?? 0;
+            const vanInStats = container.vanInStats || gateInMove?.vanInStats || '—';
+
+            const gateOutDate = container.gateOutDate || pendingOut.gateOutDate || gateOutMove?.date || '';
+            const etaPulloutDate = container.etaPulloutDate || pendingOut.etaPulloutDate || gateOutMove?.etaPulloutDate || '';
+            const gateOutToD = container.gateOutToD || pendingOut.gateOutToD || gateOutMove?.gateOutToD || '—';
+            const releaseCustomer = container.releaseCustomer || pendingOut.customer || gateOutMove?.customer || '—';
+            const gateOutEquip = pendingOut.gateOutEquipment || container.gateOutEquipment || gateOutMove?.equipment || '—';
+            const gateOutEir = pendingOut.eirRef || gateOutMove?.eir || '—';
+            const storageFeeType = container.storageFeeType || pendingOut.storageFeeType || gateOutMove?.storageFeeType || '—';
+            const storageRate = container.storageRate ?? pendingOut.storageRate ?? gateOutMove?.storageRate ?? '';
+            const storageDays = container.storageDays ?? pendingOut.storageDays ?? gateOutMove?.storageDays ?? '';
+            const vanOutAmount = container.vanOutAmount ?? pendingOut.vanOutAmount ?? gateOutMove?.vanOutAmount ?? 0;
+            const totalBilled = container.totalBilledAmount ?? pendingOut.totalAmount ?? gateOutMove?.totalAmount ?? '';
+
+            const gateOutRemarks = pendingOut.remarks || gateOutMove?.remarks || '';
+            const mergedRemarks = [
+                container.remarks ? `Gate-In: ${container.remarks}` : '',
+                gateOutRemarks && !(container.remarks || '').includes(gateOutRemarks) ? `Gate-Out: ${gateOutRemarks}` : ''
+            ].filter(Boolean).join(' • ') || '—';
+
+            const gateInPhotos = [
+                ...(Array.isArray(container.photos) ? container.photos : []),
+                ...(Array.isArray(gateInMove?.photos) ? gateInMove.photos : [])
+            ];
+            const gateOutPhotos = [
+                ...(Array.isArray(container.releasePhotos) ? container.releasePhotos : []),
+                ...(Array.isArray(pendingOut.releasePhotos) ? pendingOut.releasePhotos : []),
+                ...(Array.isArray(gateOutMove?.photos) ? gateOutMove.photos : [])
+            ];
+
+            content.innerHTML = `
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                    <div>
+                        <h3 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-box-open text-sky-400"></i>
+                            Merged Gate-In &amp; Gate-Out Details: <span class="font-mono text-amber-300">${escapeHtml(cleanNo)}</span>
+                        </h3>
+                        <p class="text-xs text-slate-300 mt-0.5">
+                            Current Status: <strong class="text-white">${escapeHtml(container.status || '—')}</strong> •
+                            Condition: <strong class="text-white">${escapeHtml(container.condition || '—')}</strong> •
+                            Size/Type: <strong class="text-white">${escapeHtml(container.size || '—')} / ${escapeHtml(container.type || 'Dry')}</strong> •
+                            Line: <strong class="text-white">${escapeHtml(container.line || '—')}</strong>
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeSubModule()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-700">
+                        Close
+                    </button>
+                </div>
+
+                <div class="bg-white text-slate-900 rounded-2xl p-5 space-y-5 text-xs">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="border border-sky-200 bg-sky-50/40 rounded-xl p-4 space-y-2">
+                            <div class="font-extrabold text-sky-900 uppercase tracking-wider text-[11px] border-b border-sky-200 pb-1.5">
+                                <i class="fa-solid fa-right-to-bracket mr-1.5"></i> Gate-In Details
+                            </div>
+                            <div class="grid grid-cols-2 gap-y-1.5 gap-x-2">
+                                <span class="text-slate-600 font-semibold">Gate-In Date/Time:</span>
+                                <span class="font-mono font-bold">${escapeHtml(fmtDt(gateInDate))}</span>
+                                <span class="text-slate-600 font-semibold">ETA Arrival:</span>
+                                <span class="font-mono">${escapeHtml(fmtDt(etaInDate))}</span>
+                                <span class="text-slate-600 font-semibold">Time of Day:</span>
+                                <span class="font-bold">${escapeHtml(gateInToD)}</span>
+                                <span class="text-slate-600 font-semibold">Trucking / Plate:</span>
+                                <span>${escapeHtml(truckingName)} • <span class="font-mono font-bold">${escapeHtml(gateInPlate)}</span></span>
+                                <span class="text-slate-600 font-semibold">Driver:</span>
+                                <span>${escapeHtml(gateInDriver)}</span>
+                                <span class="text-slate-600 font-semibold">Equipment:</span>
+                                <span class="font-bold">${escapeHtml(gateInEquip)}</span>
+                                <span class="text-slate-600 font-semibold">Gate-In EIR / Ref:</span>
+                                <span class="font-mono">${escapeHtml(gateInEir)}</span>
+                                <span class="text-slate-600 font-semibold">Yard Slot:</span>
+                                <span class="font-mono">Blk ${escapeHtml(container.block || 'A')} / ${escapeHtml(container.bay || 'BAY-1')} / ${escapeHtml(container.row || 'GROUND')} / T${escapeHtml(container.tier || '1')}</span>
+                                <span class="text-slate-600 font-semibold">Van-In Fee / Status:</span>
+                                <span class="font-mono font-bold text-emerald-700">${escapeHtml(fmtPeso(vanInAmount))} (${escapeHtml(vanInStats)})</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-amber-200 bg-amber-50/40 rounded-xl p-4 space-y-2">
+                            <div class="font-extrabold text-amber-900 uppercase tracking-wider text-[11px] border-b border-amber-200 pb-1.5">
+                                <i class="fa-solid fa-right-from-bracket mr-1.5"></i> Gate-Out &amp; Billing Details
+                            </div>
+                            <div class="grid grid-cols-2 gap-y-1.5 gap-x-2">
+                                <span class="text-slate-600 font-semibold">Gate-Out Date/Time:</span>
+                                <span class="font-mono font-bold">${escapeHtml(fmtDt(gateOutDate))}</span>
+                                <span class="text-slate-600 font-semibold">ETA Pull-Out:</span>
+                                <span class="font-mono">${escapeHtml(fmtDt(etaPulloutDate))}</span>
+                                <span class="text-slate-600 font-semibold">Time of Day:</span>
+                                <span class="font-bold">${escapeHtml(gateOutToD)}</span>
+                                <span class="text-slate-600 font-semibold">Release To / Customer:</span>
+                                <span class="font-bold">${escapeHtml(releaseCustomer)}</span>
+                                <span class="text-slate-600 font-semibold">Gate-Out Equipment:</span>
+                                <span class="font-bold">${escapeHtml(gateOutEquip)}</span>
+                                <span class="text-slate-600 font-semibold">Gate-Out EIR / Ref:</span>
+                                <span class="font-mono">${escapeHtml(gateOutEir)}</span>
+                                <span class="text-slate-600 font-semibold">Storage Type / Rate:</span>
+                                <span class="font-mono">${escapeHtml(storageFeeType)}${storageRate !== '' ? ` @ ${escapeHtml(fmtPeso(storageRate))}/d` : ''}</span>
+                                <span class="text-slate-600 font-semibold">Storage Days:</span>
+                                <span class="font-mono font-bold">${storageDays !== '' ? `${escapeHtml(storageDays)} day(s)` : '—'}</span>
+                                <span class="text-slate-600 font-semibold">Van-Out / Total Billed:</span>
+                                <span class="font-mono font-bold text-emerald-700">${escapeHtml(fmtPeso(vanOutAmount))} / ${escapeHtml(fmtPeso(totalBilled))}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <div class="font-bold text-slate-800 mb-1">Merged Remarks</div>
+                        <div class="text-slate-700 whitespace-pre-line">${escapeHtml(mergedRemarks)}</div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="border border-slate-200 rounded-xl p-3">
+                            <div class="font-bold text-slate-800 mb-2">Gate-In Attachments (${gateInPhotos.length})</div>
+                            <div>${renderPhotoThumbnailsForReport(gateInPhotos, 'No Gate-In photos')}</div>
+                        </div>
+                        <div class="border border-slate-200 rounded-xl p-3">
+                            <div class="font-bold text-slate-800 mb-2">Gate-Out Attachments (${gateOutPhotos.length})</div>
+                            <div>${renderPhotoThumbnailsForReport(gateOutPhotos, 'No Gate-Out photos')}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
         }
 			
 		function resolveRevenueEquipmentType(revRow) {
