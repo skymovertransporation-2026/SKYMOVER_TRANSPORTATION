@@ -8657,19 +8657,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		async function insertGeofenceAlertToSupabase({ unitId = null, driverName = null, zoneId = null, alertType = 'GEOFENCE', message, lat = null, lng = null, nearestHub = null, distanceKm = null }) {
             if (!supabaseClient) return;
             try {
+                const cleanZoneId = (zoneId === '' || zoneId === undefined) ? null : zoneId;
+                const cleanLat = (lat === '' || lat === undefined || lat === null || Number.isNaN(Number(lat))) ? null : Number(lat);
+                const cleanLng = (lng === '' || lng === undefined || lng === null || Number.isNaN(Number(lng))) ? null : Number(lng);
+                const cleanDist = (distanceKm === '' || distanceKm === undefined || distanceKm === null || Number.isNaN(Number(distanceKm))) ? null : Number(distanceKm);
+
                 const { error } = await supabaseClient.from('geofence_alerts').insert({
-                    unit_id: unitId,
-                    driver_name: driverName,
-                    zone_id: zoneId,
-                    zone_name: nearestHub,
-                    alert_type: alertType,
-                    message: message,
-                    latitude: lat,
-                    longitude: lng,
-                    nearest_hub: nearestHub,
-                    distance_km: distanceKm,
+                    unit_id: unitId || null,
+                    driver_name: driverName || null,
+                    zone_id: cleanZoneId,
+                    zone_name: nearestHub || null,
+                    alert_type: alertType || 'GEOFENCE',
+                    message: String(message ?? ''),
+                    latitude: cleanLat,
+                    longitude: cleanLng,
+                    nearest_hub: nearestHub || null,
+                    distance_km: cleanDist,
                     status: 'Active'
                 });
+
                 if (error) {
                     console.warn('insertGeofenceAlertToSupabase error:', error.message);
                     alert('⚠️ Cloud sync warning for geofence_alerts: ' + error.message);
