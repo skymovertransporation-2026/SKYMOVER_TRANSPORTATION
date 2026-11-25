@@ -4836,7 +4836,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        async function submitDriverGeofenceAlert(event, presetAlertType = null) {
+		async function submitDriverGeofenceAlert(event, presetAlertType = null) {
             if (event && typeof event.preventDefault === 'function') {
                 event.preventDefault();
             }
@@ -4858,7 +4858,29 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 document.getElementById('driverGeofenceAlertBtn') ||
                 document.getElementById('sendDriverGeofenceAlertBtn');
 
-            const identity = resolveDriverIdentityForWrite();
+            const dispatchSelectEl =
+                document.getElementById('driverActiveDispatchSelect') ||
+                document.getElementById('driverTripSelect');
+            const selectedDispatchRec = (dispatchSelectEl && dispatchSelectEl.value !== '')
+                ? (db.dispatchLogs || []).find((d, idx) => {
+                    const key = (d && d.id !== undefined && d.id !== null) ? String(d.id) : String(idx);
+                    return key === String(dispatchSelectEl.value);
+                })
+                : null;
+
+            const preferredUnit = selectedDispatchRec
+                ? (selectedDispatchRec.unit || selectedDispatchRec.unit_id || '')
+                : ((db.vehicles && db.vehicles[0] && db.vehicles[0].id) ? db.vehicles[0].id : '');
+
+            let identity = resolveDriverIdentityForWrite(preferredUnit);
+
+            if ((!identity.unit_id || identity.unit_id === 'UNASSIGNED') && ['admin', 'dispatcher'].includes(currentUserRole)) {
+                identity = {
+                    driver_name: (selectedDispatchRec && (selectedDispatchRec.driver || selectedDispatchRec.driver_name)) || currentUserEmail || 'Admin Dispatch',
+                    unit_id: preferredUnit || 'ADMIN-UNIT'
+                };
+            }
+
             if (!identity.unit_id || identity.unit_id === 'UNASSIGNED') {
                 alert("Cannot submit GPS geofence alert: No truck unit is assigned to your driver profile.");
                 return;
@@ -4870,21 +4892,32 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
 
             try {
-                let lat = latInputEl && latInputEl.value !== '' ? parseFloat(latInputEl.value) : NaN;
-                let lng = lngInputEl && lngInputEl.value !== '' ? parseFloat(lngInputEl.value) : NaN;
+                let lat = latInputEl && latInputEl.value.trim() !== '' ? parseFloat(latInputEl.value) : NaN;
+                let lng = lngInputEl && lngInputEl.value.trim() !== '' ? parseFloat(lngInputEl.value) : NaN;
 
-                if ((isNaN(lat) || isNaN(lng)) && navigator.geolocation) {
-                    const pos = await new Promise((resolve, reject) =>
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true })
-                    );
-                    lat = Number(pos.coords.latitude.toFixed(6));
-                    lng = Number(pos.coords.longitude.toFixed(6));
-                    if (latInputEl) latInputEl.value = lat;
-                    if (lngInputEl) lngInputEl.value = lng;
+                if ((Number.isNaN(lat) || Number.isNaN(lng)) && navigator.geolocation) {
+                    try {
+                        const pos = await new Promise((resolve, reject) =>
+                            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true })
+                        );
+                        lat = Number(pos.coords.latitude.toFixed(6));
+                        lng = Number(pos.coords.longitude.toFixed(6));
+                        if (latInputEl) latInputEl.value = lat;
+                        if (lngInputEl) lngInputEl.value = lng;
+                    } catch (gpsErr) {
+                        const retryLat = latInputEl && latInputEl.value.trim() !== '' ? parseFloat(latInputEl.value) : NaN;
+                        const retryLng = lngInputEl && lngInputEl.value.trim() !== '' ? parseFloat(lngInputEl.value) : NaN;
+                        if (!Number.isNaN(retryLat) && !Number.isNaN(retryLng)) {
+                            lat = retryLat;
+                            lng = retryLng;
+                        } else {
+                            throw new Error(gpsErr && gpsErr.message ? gpsErr.message : "Unable to acquire GPS coordinates.");
+                        }
+                    }
                 }
 
-                if (isNaN(lat) || isNaN(lng)) {
-                    throw new Error("GPS coordinates are required. Enable browser location services or enter Latitude/Longitude.");
+                if (Number.isNaN(lat) || Number.isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    throw new Error("Valid GPS coordinates are required (Latitude -90..90, Longitude -180..180).");
                 }
 
                 const proximity = evaluateNearestGeofenceOrHub(lat, lng);
@@ -4892,8 +4925,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     || (alertTypeEl && alertTypeEl.value.trim())
                     || (proximity.insideZone ? 'Geofence Check-In' : 'Outside Geofence / Transit Ping');
                 const noteText = customNoteEl && customNoteEl.value.trim() ? ` — Note: ${customNoteEl.value.trim()}` : '';
-                const distSummary = proximity.distanceKm !== null
-                    ? `${proximity.insideZone ? 'INSIDE' : `${proximity.distanceKm} km from`} ${proximity.zoneName} (${proximity.radiusKm} km radius)`
+                const safeDistanceKm = (proximity.distanceKm !== null && proximity.distanceKm !== undefined && Number.isFinite(Number(proximity.distanceKm)))
+                    ? Number(proximity.distanceKm)
+                    : null;
+
+                const distSummary = safeDistanceKm !== null
+                    ? `${proximity.insideZone ? 'INSIDE' : `${safeDistanceKm} km from`} ${proximity.zoneName} (${proximity.radiusKm} km radius)`
                     : proximity.zoneName;
 
                 const alertMessage = `[${alertType}] Unit ${identity.unit_id} (${identity.driver_name}) at (${lat}, ${lng}) • ${distSummary}${noteText}`;
@@ -4908,7 +4945,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     latitude: lat,
                     longitude: lng,
                     nearest_hub: proximity.zoneName,
-                    distance_km: proximity.distanceKm,
+                    distance_km: safeDistanceKm,
                     status: 'Active',
                     created_at: nowIso
                 };
@@ -4923,27 +4960,39 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     throw new Error(`RLS / Database insert rejected: ${error.message}`);
                 }
 
+                const newId = data && data.id !== undefined && data.id !== null ? data.id : Date.now();
+                const finalTs = (data && data.created_at) ? data.created_at : nowIso;
+
                 if (!Array.isArray(db.geofenceAlerts)) db.geofenceAlerts = [];
-                db.geofenceAlerts.unshift({
-                    id: data ? data.id : Date.now(),
-                    unit: identity.unit_id,
-                    driver: identity.driver_name,
-                    zone: proximity.zoneName,
-                    type: alertType,
-                    message: alertMessage,
-                    lat: lat,
-                    lng: lng,
-                    status: 'Active',
-                    time: (data && data.created_at) ? data.created_at : nowIso,
-                    timestamp: (data && data.created_at) ? data.created_at : nowIso
-                });
+                const alreadyPresent = db.geofenceAlerts.some(a =>
+                    (a && a.id !== undefined && a.id !== null && String(a.id) === String(newId)) ||
+                    (a && a.message === alertMessage)
+                );
+
+                if (!alreadyPresent) {
+                    db.geofenceAlerts.unshift({
+                        id: newId,
+                        unit: identity.unit_id,
+                        driver: identity.driver_name,
+                        zone: proximity.zoneName,
+                        type: alertType,
+                        message: alertMessage,
+                        lat: lat,
+                        lng: lng,
+                        status: 'Active',
+                        time: finalTs,
+                        timestamp: finalTs
+                    });
+                }
 
                 if (customNoteEl) customNoteEl.value = '';
                 saveDB();
 
                 try {
                     await saveCloudData();
-                } catch (syncErr) {}
+                } catch (syncErr) {
+                    console.warn("Cloud payload sync warning after geofence alert:", syncErr);
+                }
 
                 renderDriverGeofenceAlerts();
                 alert(`📡 GPS Geofence Alert submitted for Unit ${identity.unit_id}!\nLocation: ${distSummary}`);
