@@ -3436,6 +3436,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const costNum = typeof parsePesoNumber === 'function' ? parsePesoNumber(f.cost) : String(f.cost || '');
                 return `fuel:${unit}_${date}_${station}_${costNum}`;
             });
+			db.expenseLogs = deduplicateArrayByKey(db.expenseLogs, e => {
+                if (e.id) return `id:${e.id}`;
+                const trip = (e.trip || '').trim().toUpperCase();
+                const fuelNum = typeof parsePesoNumber === 'function' ? parsePesoNumber(e.fuel) : String(e.fuel || '');
+                const tollsNum = typeof parsePesoNumber === 'function' ? parsePesoNumber(e.tolls) : String(e.tolls || '');
+                const maintNum = typeof parsePesoNumber === 'function' ? parsePesoNumber(e.maintenance) : String(e.maintenance || '');
+                const totalNum = typeof parsePesoNumber === 'function' ? parsePesoNumber(e.total) : String(e.total || '');
+                return `exp:${trip}_${fuelNum}_${tollsNum}_${maintNum}_${totalNum}`;
+            });
             db.hubLocations = deduplicateArrayByKey(db.hubLocations, h => `name:${(h.name || '').trim().toLowerCase()}`);
             db.systemUsers = deduplicateArrayByKey(db.systemUsers, u => `email:${(u.email || '').trim().toLowerCase()}`);
             db.transshipments = deduplicateArrayByKey(db.transshipments, t => `id:${(t.id || '').trim().toUpperCase()}`);
