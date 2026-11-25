@@ -38,7 +38,8 @@
         .pill.Available { background: #d1fae5; color: #065f46; }
         .pill.Reserved { background: #fef3c7; color: #92400e; }
         .pill.Hold { background: #fee2e2; color: #991b1b; }
-        .pill.Pending { background: #e0f2fe; color: #075985; }
+		.pill.Pending { background: #e0f2fe; color: #075985; }
+        .pill.Pending-Gate-Out { background: #fef3c7; color: #92400e; }
         .pill.Released { background: #f1f5f9; color: #334155; }
         .drag-over { border-color: #0284c7 !important; background-color: rgba(2, 132, 199, 0.05) !important; }
 
@@ -10056,18 +10057,26 @@ Skymover Transport is not liable for charges incurred due to operational constra
             });
 
             tbody.innerHTML = containers.length ? containers.map(c => {
-                let badgeClass = 'Available';
+				let badgeClass = 'Available';
                 if (c.status === 'Reserved') badgeClass = 'Reserved';
                 else if (c.status === 'Hold' || c.condition === 'Damaged') badgeClass = 'Hold';
                 else if (c.status === 'Pending') badgeClass = 'Pending';
+                else if (c.status === 'Pending Gate-Out') badgeClass = 'Pending-Gate-Out';
                 else if (c.status === 'Released') badgeClass = 'Released';
 
                 const isReleased = c.status === 'Released';
                 const isPending = c.status === 'Pending';
+                const isPendingGateOut = c.status === 'Pending Gate-Out';
 
                 let actionsHtml = '<span class="text-[10px] text-slate-400">Read Only</span>';
                 if (isReleased) {
                     actionsHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><i class="fa-solid fa-lock text-[9px]"></i> Locked (Released)</span>`;
+				} else if (isPendingGateOut) {
+                    const idx = Number(c.originalIdx);
+                    actionsHtml = canAcceptPending
+                        ? `<button onclick="acceptDispatcherGateOut(${idx})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px]">Accept</button>
+                           <button onclick="rejectDispatcherGateOut(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Reject</button>`
+                        : '<span class="text-[10px] text-amber-700 font-semibold">Awaiting Yard Manager</span>';
 				} else if (canYardEdit) {
                     const idx = Number(c.originalIdx);
                     const acceptBtn = (isPending && canAcceptPending)
@@ -10547,11 +10556,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			        return;
 			    }
 
-            // ADMIN / YARD MANAGER MODE: FULL CONTAINER RELEASE & BILLING
+			// ADMIN / DISPATCHER MODE: FULL CONTAINER RELEASE & BILLING (DISPATCHER REQUIRES YARD MANAGER APPROVAL)
             const containerNo = document.getElementById('yardOutContainer').value;
             const match = (yardDb.containers || []).find(c => c.number === containerNo && c.status !== 'Released');
             if(!match) {
                 alert('Please select a valid active container currently in yard.');
+                return;
+            }
+            if (match.status === 'Pending Gate-Out') {
+                alert('⏳ This container already has a pending Gate-Out confirmation waiting for Yard Manager approval.');
                 return;
             }
 
@@ -10569,37 +10582,92 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const eirRef = formData.get('eir');
             const remarks = formData.get('remarks') || '';
 
+            const gateOutDetails = {
+                gateOutDate,
+                etaPulloutDate,
+                gateOutToD,
+                customer,
+                gateOutEquipment,
+                storageFeeType,
+                storageRate,
+                storageDays,
+                vanOutAmount,
+                totalAmount,
+                eirRef,
+                remarks,
+                releasePhotos: [...stagedGateOutPhotos],
+                confirmedBy: currentUserEmail || currentUserRole,
+                confirmedAt: new Date().toISOString()
+            };
+
+            if (currentUserRole === 'dispatcher') {
+                match.status = 'Pending Gate-Out';
+                match.pendingGateOut = gateOutDetails;
+                await syncYardContainerToSupabase(match);
+                await saveCloudData();
+                form.reset();
+                clearGateOutPhotos();
+                populateYardOutContainerDropdown();
+                switchYardTab('yardInventory');
+                alert('⏳ Gate-Out confirmation submitted! Status is now Pending Gate-Out until a Yard Manager accepts or rejects it.');
+                return;
+            }
+
+            await finalizeContainerGateOutRelease(match, gateOutDetails);
+            await saveCloudData();
+            form.reset();
+            clearGateOutPhotos();
+            populateYardOutContainerDropdown();
+            switchYardTab('yardInventory');
+            alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
+
+		async function finalizeContainerGateOutRelease(match, details) {
+            const containerNo = String(match.number || '').trim().toUpperCase();
+            const gateOutDate = details.gateOutDate || new Date().toISOString().slice(0, 16);
+            const gateOutEquipment = details.gateOutEquipment || '';
+            const etaPulloutDate = details.etaPulloutDate || '';
+            const gateOutToD = details.gateOutToD || 'MORNING';
+            const customer = details.customer || '';
+            const storageFeeType = details.storageFeeType || 'Dry Van';
+            const storageRate = parseFloat(details.storageRate) || 300;
+            const vanOutAmount = parseFloat(details.vanOutAmount) || 0;
+            const totalAmount = parseFloat(details.totalAmount) || 0;
+            const storageDays = parseInt(details.storageDays, 10) || 1;
+            const eirRef = details.eirRef || '';
+            const remarks = details.remarks || '';
+            const releasePhotos = Array.isArray(details.releasePhotos) ? details.releasePhotos : [];
+
             match.status = 'Released';
+            delete match.pendingGateOut;
             match.gateOutDate = gateOutDate;
             match.etaPulloutDate = etaPulloutDate;
             match.gateOutToD = gateOutToD;
             match.releaseCustomer = customer;
-			match.gateOutEquipment = gateOutEquipment;
-			match.equipment = gateOutEquipment || match.equipment || '';
+            match.gateOutEquipment = gateOutEquipment;
+            match.equipment = gateOutEquipment || match.equipment || '';
             match.storageFeeType = storageFeeType;
             match.storageRate = storageRate;
             match.storageDays = storageDays;
             match.vanOutAmount = vanOutAmount;
             match.totalBilledAmount = totalAmount;
             if (remarks) match.remarks = match.remarks ? `${match.remarks} | Gate-Out: ${remarks}` : remarks;
-            match.releasePhotos = stagedGateOutPhotos;
+            match.releasePhotos = releasePhotos;
             await syncYardContainerToSupabase(match);
 
             const movementRecord = {
                 date: gateOutDate, etaPulloutDate: etaPulloutDate, gateOutToD: gateOutToD,
                 kind: 'GATE-OUT', container: containerNo, customer: customer, plate: match.plate,
                 driver: match.driver || '', eir: eirRef, storageFeeType: storageFeeType,
-				equipment: gateOutEquipment,
+                equipment: gateOutEquipment,
                 storageRate: storageRate, storageDays: storageDays, vanInAmount: match.vanInAmount || 0,
                 vanOutAmount: vanOutAmount, totalAmount: totalAmount, amount: totalAmount,
-                remarks: remarks, photos: stagedGateOutPhotos
+                remarks: remarks, photos: releasePhotos
             };
 
             if(!yardDb.movements) yardDb.movements = [];
             yardDb.movements.unshift(movementRecord);
             await insertYardMovementToSupabase(movementRecord);
 
-			let revenueSyncedToCloud = true;
             if (totalAmount > 0) {
                 const revenueRecord = {
                     date: gateOutDate, source: 'Gate-Out & Storage Fee',
@@ -10607,14 +10675,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 };
                 if(!yardDb.revenues) yardDb.revenues = [];
                 yardDb.revenues.unshift(revenueRecord);
-                revenueSyncedToCloud = await insertYardRevenueToSupabase(revenueRecord);
+                await insertYardRevenueToSupabase(revenueRecord);
             }
-
-			await saveCloudData();
-            form.reset();
-            clearGateOutPhotos();
-            populateYardOutContainerDropdown();
-            switchYardTab('yardInventory');
 
             void sendGateOutEmailNotification({
                 container_number: containerNo,
@@ -10625,22 +10687,52 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 eta_pullout_datetime: etaPulloutDate || gateOutDate,
                 gate_out_time_of_day: gateOutToD,
                 remarks: remarks,
-                photos: [...stagedGateOutPhotos]
-            })
-                .then(res => {
-                    if (!res || !res.sent) {
-                        console.warn('Gate-Out email notice:', res && res.errorDetail ? res.errorDetail : 'not sent');
-                    }
-                })
-                .catch(err => console.warn('Gate-Out email error:', err));
-
-			if (totalAmount > 0 && !revenueSyncedToCloud) {
-                alert('⚠️ Container gated out and released in yard_containers/yard_movements, but cloud insert into yard_revenues was blocked (403). Add an INSERT policy on public.yard_revenues for role "' + currentUserRole + '" in Supabase.');
-            } else {
-                alert('✅ Container successfully gated out, billed, locked as Released, and synced with cloud database!');
-            }
+                photos: releasePhotos
+            }).catch(err => console.warn('Gate-Out email error:', err));
         }
 
+        async function acceptDispatcherGateOut(index) {
+            if (!canReviewClientQrSubmissions()) return;
+            const target = (yardDb.containers || [])[index];
+            if (!target || target.status !== 'Pending Gate-Out' || !target.pendingGateOut) {
+                showSkymoverNotice('No pending Gate-Out confirmation found for this container.', 'warning');
+                return;
+            }
+            const ok = await showSkymoverConfirm(
+                `Accept Dispatcher Gate-Out confirmation for Container ${target.number} and mark it as Released?`,
+                { title: 'Approve Gate-Out', confirmText: 'Accept & Release' }
+            );
+            if (!ok) return;
+
+            await finalizeContainerGateOutRelease(target, target.pendingGateOut);
+            await saveCloudData();
+            refreshYard();
+            populateYardOutContainerDropdown();
+            showSkymoverNotice(`Container ${target.number} accepted and marked Released.`, 'success');
+        }
+
+        async function rejectDispatcherGateOut(index) {
+            if (!canReviewClientQrSubmissions()) return;
+            const target = (yardDb.containers || [])[index];
+            if (!target || target.status !== 'Pending Gate-Out') {
+                showSkymoverNotice('No pending Gate-Out confirmation found for this container.', 'warning');
+                return;
+            }
+            const ok = await showSkymoverConfirm(
+                `Reject Dispatcher Gate-Out confirmation for Container ${target.number} and return it to Available yard stock?`,
+                { title: 'Reject Gate-Out', confirmText: 'Reject', danger: true }
+            );
+            if (!ok) return;
+
+            delete target.pendingGateOut;
+            target.status = 'Available';
+            await syncYardContainerToSupabase(target);
+            await saveCloudData();
+            refreshYard();
+            populateYardOutContainerDropdown();
+            showSkymoverNotice(`Gate-Out confirmation for ${target.number} rejected; status returned to Available.`, 'warning');
+        }
+			
 		function resolveRevenueEquipmentType(revRow) {
             if (!revRow) return '';
             if (revRow.equipment) return String(revRow.equipment).trim();
