@@ -1537,13 +1537,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if (__yardSettingsInFlight) return __yardSettingsInFlight;
             if (!forceOverwriteInputs && now - __lastYardSettingsFetchMs < 5000) return;
 
-            __yardSettingsInFlight = (async () => {
+			__yardSettingsInFlight = (async () => {
                 try {
-                    const { data, error } = await supabaseClient
-                        .from('yard_settings')
-                        .select('operating_hours, facility_rates, waiver_terms, updated_at')
-                        .eq('id', 1)
-                        .maybeSingle();
+                    const { data, error } = await runWithTimeoutAndRetry(
+                        () => supabaseClient
+                            .from('yard_settings')
+                            .select('operating_hours, facility_rates, waiver_terms, updated_at')
+                            .eq('id', 1)
+                            .maybeSingle(),
+                        { timeoutMs: 10000, retries: 2, actionLabel: 'load yard portal settings' }
+                    );
 
                     if (!error && data) {
                         const merged = {
@@ -2386,6 +2389,91 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             return await dispatchReliableYardEmail(recipientEmail, subject, payload);
         }
+
+		// ==========================================
+        // PRODUCTION TIMEOUT, RETRY & ERROR FORMATTER
+        // ==========================================
+        function isTransientSupabaseError(err) {
+            const status = Number(err?.status || err?.statusCode || err?.code || 0);
+            if ([408, 425, 429, 500, 502, 503, 504, 522].includes(status)) return true;
+
+            const msg = String(err?.message || err || '').toLowerCase();
+            return (
+                msg.includes('timeout') ||
+                msg.includes('timed out') ||
+                msg.includes('522') ||
+                msg.includes('502') ||
+                msg.includes('503') ||
+                msg.includes('504') ||
+                msg.includes('fetch failed') ||
+                msg.includes('networkerror') ||
+                msg.includes('connection terminated') ||
+                msg.includes('aborterror')
+            );
+        }
+
+        function formatSupabaseUserError(err, actionLabel = 'complete this request') {
+            const status = Number(err?.status || err?.statusCode || 0);
+            const rawMsg = String(err?.message || err || '').trim();
+
+            if (status === 522 || rawMsg.toLowerCase().includes('522') || rawMsg.toLowerCase().includes('timeout')) {
+                return `Connection timed out while trying to ${actionLabel}. The database or connection pool is slow or busy—please wait a moment and try again.`;
+            }
+            if (status === 401 || status === 403 || rawMsg.toLowerCase().includes('row-level security') || rawMsg.toLowerCase().includes('permission denied')) {
+                return `Access denied while trying to ${actionLabel}. Please check your sign-in session and role permissions.`;
+            }
+            if (status === 409 || rawMsg.includes('23505') || rawMsg.toLowerCase().includes('duplicate')) {
+                return `A matching record already exists and could not be duplicated while trying to ${actionLabel}.`;
+            }
+            if (status >= 500) {
+                return `Server error while trying to ${actionLabel}. Please try again shortly or contact your administrator if it persists.`;
+            }
+            return rawMsg
+                ? `Unable to ${actionLabel}: ${rawMsg}`
+                : `Unable to ${actionLabel}. Please check your connection and try again.`;
+        }
+
+        async function runWithTimeoutAndRetry(operationFn, {
+            timeoutMs = 12000,
+            retries = 2,
+            baseDelayMs = 800,
+            actionLabel = 'sync with database'
+        } = {}) {
+            let lastErr = null;
+
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                let timerId = null;
+                try {
+                    const timeoutPromise = new Promise((_, reject) => {
+                        timerId = setTimeout(() => {
+                            const tErr = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s while trying to ${actionLabel}.`);
+                            tErr.status = 522;
+                            reject(tErr);
+                        }, timeoutMs);
+                    });
+
+                    const result = await Promise.race([Promise.resolve().then(operationFn), timeoutPromise]);
+                    clearTimeout(timerId);
+
+                    if (result && typeof result === 'object' && 'error' in result && result.error) {
+                        throw result.error;
+                    }
+                    return result;
+                } catch (err) {
+                    clearTimeout(timerId);
+                    lastErr = err;
+
+                    const shouldRetry = attempt < retries && isTransientSupabaseError(err);
+                    if (!shouldRetry) break;
+
+                    const delay = baseDelayMs * Math.pow(2, attempt);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+
+            throw lastErr;
+        }
+		
 		// Sync Echo Guard & In-Flight Lock to prevent Realtime events from wiping newly added rows
         let isSavingCloudData = false;
         let lastLocalSaveTimestamp = 0;
@@ -3880,14 +3968,22 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 refreshYard();
                 refreshHubDatalist();
 
-                if(supabaseClient && !isClientQrMode) {
-                    const { error } = await supabaseClient.from('skymover_enterprise_db').upsert({
-                        id: 1,
-                        payload: { managementBackend: db, emptyYard: yardDb },
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
-                    if (error) {
-                        console.warn("Supabase enterprise payload sync notice:", error.message);
+				if(supabaseClient && !isClientQrMode) {
+                    try {
+                        await runWithTimeoutAndRetry(
+                            () => supabaseClient.from('skymover_enterprise_db').upsert({
+                                id: 1,
+                                payload: { managementBackend: db, emptyYard: yardDb },
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'id' }),
+                            { timeoutMs: 12000, retries: 2, actionLabel: 'save enterprise database state' }
+                        );
+                    } catch (syncErr) {
+                        const friendlyMsg = formatSupabaseUserError(syncErr, 'save enterprise database state');
+                        console.warn("Supabase enterprise payload sync notice:", friendlyMsg);
+                        if (typeof showSkymoverNotice === 'function') {
+                            showSkymoverNotice(friendlyMsg, 'warning');
+                        }
                     }
                 }
             } catch(e) {
