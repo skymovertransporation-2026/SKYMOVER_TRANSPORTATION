@@ -7919,14 +7919,47 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     }
                 } catch (storageErr) { receiptUrl = receiptFileObj.dataUrl; }
             }
+		const loggedAtIso = fuelRecord.logged_at || new Date().toISOString();
+            fuelRecord.logged_at = loggedAtIso;
+            const numericLiters = parseFloat(fuelRecord.liters) || 0;
+            const numericCost = typeof parsePesoNumber === 'function'
+                ? parsePesoNumber(fuelRecord.cost)
+                : (parseFloat(String(fuelRecord.cost || '').replace(/[^\d.]/g, '')) || 0);
+
             try {
-                const { data, error: insertError } = await supabaseClient.from('fuel_logs').insert({
-                    unit_id: fuelRecord.unit, liters: parseFloat(fuelRecord.liters),
-                    cost: parseFloat(fuelRecord.cost.replace(/[^\d.]/g, '')),
-                    station: fuelRecord.station, receipt_url: receiptUrl, logged_at: new Date().toISOString()
-                }).select().single();
-                if (!insertError && data && data.id) fuelRecord.id = data.id;
-            } catch (e) {}
+                const { data, error: insertError } = await supabaseClient
+                    .from('fuel_logs')
+                    .insert({
+                        unit_id: fuelRecord.unit,
+                        liters: numericLiters,
+                        cost: numericCost,
+                        station: fuelRecord.station,
+                        receipt_url: receiptUrl,
+                        logged_at: loggedAtIso
+                    })
+                    .select()
+                    .single();
+
+                if (insertError) {
+                    if (insertError.code === '23505') {
+                        console.warn('Duplicate fuel log blocked by unique index:', insertError.message);
+                        alert('⚠️ This fuel entry is already recorded and was skipped to prevent duplicates.');
+                        return false;
+                    }
+                    console.warn('insertFuelLogToSupabase error:', insertError.message);
+                    alert('⚠️ Cloud sync warning for fuel_logs: ' + insertError.message);
+                    return false;
+                }
+
+                if (data && data.id) {
+                    fuelRecord.id = data.id;
+                }
+            } catch (err) {
+                console.warn('insertFuelLogToSupabase exception:', err.message || err);
+                alert('❌ Failed to save fuel log to cloud: ' + (err.message || err));
+                return false;
+            }
+
             if (!db.fuelLogs) db.fuelLogs = [];
             db.fuelLogs.unshift(fuelRecord);
             await saveCloudData();
