@@ -7846,18 +7846,34 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (e) {}
         }
 
-        async function insertDriverToSupabase(driverRecord) {
+		async function insertDriverToSupabase(driverRecord) {
             if (!supabaseClient) return false;
             try {
+                const licenseVal = driverRecord.driver_license_number || driverRecord.driver_license || '';
                 const { data, error } = await supabaseClient.from('drivers').insert({
-                    driver_name: driverRecord.driver_name, driver_license: driverRecord.driver_license_number,
-                    driver_phone: driverRecord.driver_phone, helper_name: driverRecord.helper_name,
-                    helper_phone: driverRecord.helper_phone, assigned_unit: driverRecord.truck || 'Unassigned',
-                    status: driverRecord.status || 'Available', rating: 5.00, attachments: driverRecord.attachments || []
+                    driver_name: driverRecord.driver_name,
+                    driver_license: licenseVal,
+                    driver_license_number: licenseVal,
+                    driver_phone: driverRecord.driver_phone,
+                    helper_name: driverRecord.helper_name,
+                    helper_phone: driverRecord.helper_phone,
+                    assigned_unit: driverRecord.truck || 'Unassigned',
+                    status: driverRecord.status || 'Available',
+                    rating: 5.00,
+                    attachments: driverRecord.attachments || []
                 }).select().single();
-                if (!error && data && data.id) driverRecord.id = data.id;
-                return !error;
-            } catch (err) { return false; }
+
+                if (error) {
+                    console.warn('insertDriverToSupabase error:', error.message);
+                    alert('⚠️ Cloud sync warning for drivers table: ' + error.message);
+                    return false;
+                }
+                if (data && data.id) driverRecord.id = data.id;
+                return true;
+            } catch (err) {
+                console.warn('insertDriverToSupabase exception:', err.message || err);
+                return false;
+            }
         }
 
         async function fetchFuelLogsFromSupabase() {
