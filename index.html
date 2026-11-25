@@ -6509,7 +6509,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     if (!rpcError) authDeleted = true;
                 } catch (rpcErr) {}
 
-                if (!authDeleted) {
+				if (!authDeleted) {
                     try {
                         const { error: fnError } = await supabaseClient.functions.invoke('delete-user', {
                             body: { email: targetEmail, user_id: targetUserId }
@@ -6518,9 +6518,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     } catch (fnErr) {}
                 }
 
-                try {
-                    await supabaseClient.from('system_users').delete().eq('email', targetEmail);
-                } catch (tblErr) {}
+                // RBAC user list is persisted in skymover_enterprise_db and auth deletion is handled by admin_delete_user.
             }
 
             db.systemUsers.splice(index, 1);
