@@ -1526,37 +1526,52 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
+		let __yardSettingsInFlight = null;
+        let __lastYardSettingsFetchMs = 0;
+
         async function loadYardSettingsFromSupabase(forceOverwriteInputs = false) {
             renderYardPortalSettingsToUI(activeYardPortalSettings);
             if (!supabaseClient) return;
-            try {
-                const { data, error } = await supabaseClient
-                    .from('yard_settings')
-                    .select('operating_hours, facility_rates, waiver_terms, updated_at')
-                    .eq('id', 1)
-                    .maybeSingle();
 
-                if (!error && data) {
-                    const merged = {
-                        operating_hours: data.operating_hours || DEFAULT_YARD_PORTAL_SETTINGS.operating_hours,
-                        facility_rates: data.facility_rates || DEFAULT_YARD_PORTAL_SETTINGS.facility_rates,
-                        waiver_terms: data.waiver_terms || DEFAULT_YARD_PORTAL_SETTINGS.waiver_terms,
-                        updated_at: data.updated_at || new Date().toISOString()
-                    };
-                    localStorage.setItem(YARD_SETTINGS_CACHE_KEY, JSON.stringify(merged));
-                    if (forceOverwriteInputs) {
-                        const adminHours = document.getElementById('adminEditOperatingHours');
-                        const adminRates = document.getElementById('adminEditFacilityRates');
-                        const adminWaiver = document.getElementById('adminEditWaiverTerms');
-                        if (adminHours) adminHours.value = merged.operating_hours;
-                        if (adminRates) adminRates.value = merged.facility_rates;
-                        if (adminWaiver) adminWaiver.value = merged.waiver_terms;
+            const now = Date.now();
+            if (__yardSettingsInFlight) return __yardSettingsInFlight;
+            if (!forceOverwriteInputs && now - __lastYardSettingsFetchMs < 5000) return;
+
+            __yardSettingsInFlight = (async () => {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('yard_settings')
+                        .select('operating_hours, facility_rates, waiver_terms, updated_at')
+                        .eq('id', 1)
+                        .maybeSingle();
+
+                    if (!error && data) {
+                        const merged = {
+                            operating_hours: data.operating_hours || DEFAULT_YARD_PORTAL_SETTINGS.operating_hours,
+                            facility_rates: data.facility_rates || DEFAULT_YARD_PORTAL_SETTINGS.facility_rates,
+                            waiver_terms: data.waiver_terms || DEFAULT_YARD_PORTAL_SETTINGS.waiver_terms,
+                            updated_at: data.updated_at || new Date().toISOString()
+                        };
+                        localStorage.setItem(YARD_SETTINGS_CACHE_KEY, JSON.stringify(merged));
+                        if (forceOverwriteInputs) {
+                            const adminHours = document.getElementById('adminEditOperatingHours');
+                            const adminRates = document.getElementById('adminEditFacilityRates');
+                            const adminWaiver = document.getElementById('adminEditWaiverTerms');
+                            if (adminHours) adminHours.value = merged.operating_hours;
+                            if (adminRates) adminRates.value = merged.facility_rates;
+                            if (adminWaiver) adminWaiver.value = merged.waiver_terms;
+                        }
+                        renderYardPortalSettingsToUI(merged);
+                        __lastYardSettingsFetchMs = Date.now();
                     }
-                    renderYardPortalSettingsToUI(merged);
+                } catch (err) {
+                    console.warn('loadYardSettingsFromSupabase notice:', err.message || err);
+                } finally {
+                    __yardSettingsInFlight = null;
                 }
-            } catch (err) {
-                console.warn('loadYardSettingsFromSupabase notice:', err.message || err);
-            }
+            })();
+
+            return __yardSettingsInFlight;
         }
 
         async function saveYardSettingsToSupabase(e) {
@@ -3532,18 +3547,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     await saveCloudData();
                 }
 
-                await fetchHubLocationsFromSupabase();
-				await fetchVehiclesFromSupabase();
-				await fetchDriversFromSupabase();
-				await fetchFuelLogsFromSupabase();
-                await fetchLogiTrackDataFromSupabase();
-                await fetchDispatchLogsFromSupabase();
-                await fetchFleetExpensesFromSupabase();
-                await fetchYardExpensesFromSupabase();
-                await fetchMaintenanceLogsFromSupabase();
-                await fetchYardContainersFromSupabase();
-                await fetchYardRevenuesFromSupabase();
-                await fetchYardMovementsFromSupabase();
+				await Promise.allSettled([
+                    fetchHubLocationsFromSupabase(),
+                    fetchVehiclesFromSupabase(),
+                    fetchDriversFromSupabase(),
+                    fetchFuelLogsFromSupabase(),
+                    fetchLogiTrackDataFromSupabase(),
+                    fetchDispatchLogsFromSupabase(),
+                    fetchFleetExpensesFromSupabase(),
+                    fetchYardExpensesFromSupabase(),
+                    fetchMaintenanceLogsFromSupabase(),
+                    fetchYardContainersFromSupabase(),
+                    fetchYardRevenuesFromSupabase(),
+                    fetchYardMovementsFromSupabase()
+                ]);
 
                 deduplicateAllCollections();
 
