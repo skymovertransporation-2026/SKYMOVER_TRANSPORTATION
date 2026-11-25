@@ -10705,10 +10705,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }).catch(err => console.warn('Gate-Out email error:', err));
         }
 
-        async function acceptDispatcherGateOut(index) {
+		async function acceptDispatcherGateOut(index) {
             if (!canReviewClientQrSubmissions()) return;
             const target = (yardDb.containers || [])[index];
-            if (!target || target.status !== 'Pending Gate-Out' || !target.pendingGateOut) {
+            if (!target || target.status !== 'Pending Gate-Out') {
                 showSkymoverNotice('No pending Gate-Out confirmation found for this container.', 'warning');
                 return;
             }
@@ -10718,7 +10718,23 @@ Skymover Transport is not liable for charges incurred due to operational constra
             );
             if (!ok) return;
 
-            await finalizeContainerGateOutRelease(target, target.pendingGateOut);
+            const details = target.pendingGateOut || {
+                gateOutDate: target.gateOutDate || new Date().toISOString().slice(0, 16),
+                etaPulloutDate: target.etaPulloutDate || '',
+                gateOutToD: target.gateOutToD || 'MORNING',
+                customer: target.releaseCustomer || '',
+                gateOutEquipment: target.gateOutEquipment || target.equipment || '',
+                storageFeeType: target.storageFeeType || 'Dry Van',
+                storageRate: target.storageRate || 300,
+                storageDays: target.storageDays || 1,
+                vanOutAmount: target.vanOutAmount || 0,
+                totalAmount: target.totalBilledAmount || 0,
+                eirRef: target.eir || '',
+                remarks: target.remarks || '',
+                releasePhotos: target.releasePhotos || []
+            };
+
+            await finalizeContainerGateOutRelease(target, details);
             await saveCloudData();
             refreshYard();
             populateYardOutContainerDropdown();
