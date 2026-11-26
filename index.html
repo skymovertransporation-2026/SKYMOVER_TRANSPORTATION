@@ -2575,12 +2575,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		function resolveUserRoleFromAuthUser(user) {
             if (!user) return 'guest';
             const appRole = (user.app_metadata && typeof user.app_metadata.role === 'string')
-                ? user.app_metadata.role.trim()
+                ? user.app_metadata.role.trim().toLowerCase()
                 : '';
             const metaRole = (user.user_metadata && typeof user.user_metadata.role === 'string')
-                ? user.user_metadata.role.trim()
+                ? user.user_metadata.role.trim().toLowerCase()
                 : '';
-            return appRole || metaRole || 'guest';
+            const resolved = appRole || metaRole || 'guest';
+            return resolved === 'administrator' ? 'admin' : resolved;
         }
 		
 		function canRoleModifyYard() {
@@ -2589,16 +2590,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		    return ['admin', 'yard_manager'].includes(currentUserRole);
 		}
 
-        function requireAdminExecution(actionLabel = "execute this operation") {
-            if (currentUserRole !== 'admin') {
-                alert(`⛔ RBAC Access Denied: Only an Administrator (admin) has execution rights to ${actionLabel}.`);
-                return false;
-            }
-            return true;
+		function requireAdminExecution(actionLabel = "execute this operation") {
+            if (currentUserRole === 'admin') return true;
+            alert(`⛔ RBAC Access Denied: Only an Administrator (admin) has execution rights to ${actionLabel}.`);
+            return false;
         }
 
 		function requireYardOperationExecution(actionLabel = "perform this yard operation") {
-            if (isClientQrMode) return true;
+            if (currentUserRole === 'admin' || isClientQrMode) return true;
             const lowerAction = String(actionLabel || '').toLowerCase();
             const isGateInOrOutAction = lowerAction.includes('gate-in') || lowerAction.includes('gate-out');
             const allowedRoles = isGateInOrOutAction
@@ -9133,12 +9132,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function requireDispatchExecution(actionLabel = "manage fleet dispatch") {
-            if (!['admin', 'dispatcher'].includes(currentUserRole)) {
-                alert(`⛔ RBAC Access Denied: Only an Administrator or Dispatcher has rights to ${actionLabel}.`);
-                return false;
+		function requireDispatchExecution(actionLabel = "manage fleet dispatch") {
+            if (currentUserRole === 'admin' || ['admin', 'dispatcher'].includes(currentUserRole)) {
+                return true;
             }
-            return true;
+            alert(`⛔ RBAC Access Denied: Only an Administrator or Dispatcher has rights to ${actionLabel}.`);
+            return false;
         }
 
         function onDispatchHubSelectionChange() {
@@ -10058,6 +10057,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
 		function canReviewClientQrSubmissions() {
+            if (currentUserRole === 'admin' && !isClientQrMode) return true;
             if (isClientQrMode) return false;
             if (!['admin', 'yard_manager'].includes(currentUserRole)) {
                 alert(`⛔ RBAC Access Denied: Only an Administrator or Yard Manager can accept or reject Pending Client QR Submissions.`);
@@ -10732,7 +10732,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 confirmedAt: new Date().toISOString()
             };
 
-            if (currentUserRole === 'dispatcher') {
+			if (currentUserRole !== 'admin' && currentUserRole === 'dispatcher') {
                 match.status = 'Pending Gate-Out';
                 match.pendingGateOut = gateOutDetails;
                 await syncYardContainerToSupabase(match);
