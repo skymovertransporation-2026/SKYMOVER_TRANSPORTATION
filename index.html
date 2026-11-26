@@ -703,11 +703,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <div><label class="font-bold text-slate-800 mb-1 block">Gate-In Time of Day *</label><select name="gateInToD" required class="p-2 border rounded-lg w-full bg-white text-slate-900"><option value="">Select gate-in time of day</option><option>MORNING</option><option>AFTERNOON</option><option>EVENING</option></select></div>
                             <div class="md:col-span-3"><label class="font-bold text-slate-800 mb-1 block">Remarks / Damage Details</label><textarea name="remarks" rows="2" class="p-2 border rounded-lg w-full bg-white text-slate-900"></textarea></div>
 
-                            <div class="md:col-span-3 bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-300 transition-all text-center" id="gateInDropZone"
+							<div class="md:col-span-3 bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-300 transition-all text-center" id="gateInDropZone"
                                     ondragover="handleDragOver(event, 'gateInDropZone')"
                                     ondragleave="handleDragLeave(event, 'gateInDropZone')"
                                     ondrop="handleDrop(event, 'gateIn')">
-                                <label class="font-bold text-slate-800 mb-1 block"><i class="fa-solid fa-cloud-arrow-up mr-1 text-sky-600"></i> Drag & Drop Photos/ Files Here (Upload 1 supported file (PDF, document, image, presentation, or spreadsheet) up to 10 MB.)</label>
+                                <label class="font-bold text-slate-800 mb-1 block"><i class="fa-solid fa-cloud-arrow-up mr-1 text-sky-600"></i> Drag & Drop Photos/ Files Here (Upload 1 supported file (PDF, document, image, presentation, or spreadsheet) up to 30 MB.)</label>
                                 <p class="text-[11px] text-slate-600 mb-3">or click below to browse (Cloud Upload)</p>
                                 <input type="file" id="gateInPhotoInput" accept="image/*,application/pdf" multiple onchange="handleFileInput(event, 'gateIn')" class="hidden">
                                 <button type="button" onclick="document.getElementById('gateInPhotoInput').click()" class="bg-sky-100 hover:bg-sky-200 text-sky-900 px-3 py-1.5 rounded-lg font-bold text-xs transition">Browse Files</button>
@@ -801,11 +801,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                             <div class="md:col-span-2"><label class="font-bold text-slate-800 mb-1 block">Remarks</label><textarea name="remarks" id="gateOutRemarks" rows="2" class="p-2 border rounded-lg w-full bg-white text-slate-900"></textarea></div>
 
-                            <div class="md:col-span-2 bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-300 transition-all text-center" id="gateOutDropZone"
+							<div class="md:col-span-2 bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-300 transition-all text-center" id="gateOutDropZone"
                                     ondragover="handleDragOver(event, 'gateOutDropZone')"
                                     ondragleave="handleDragLeave(event, 'gateOutDropZone')"
                                     ondrop="handleDrop(event, 'gateOut')">
-                                <label class="font-bold text-slate-800 mb-1 block"><i class="fa-solid fa-cloud-arrow-up mr-1 text-amber-600"></i> Drag & Drop Photos/ Files Here (Upload 1 supported file (PDF, document, image, presentation, or spreadsheet) up to 10 MB.)</label>
+                                <label class="font-bold text-slate-800 mb-1 block"><i class="fa-solid fa-cloud-arrow-up mr-1 text-amber-600"></i> Drag & Drop Photos/ Files Here (Upload 1 supported file (PDF, document, image, presentation, or spreadsheet) up to 30 MB.)</label>
                                 <p class="text-[11px] text-slate-600 mb-3">or click below to browse (Cloud Upload)</p>
                                 <input type="file" id="gateOutPhotoInput" accept="image/*,application/pdf" multiple onchange="handleFileInput(event, 'gateOut')" class="hidden">
                                 <button type="button" onclick="document.getElementById('gateOutPhotoInput').click()" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg font-bold text-xs transition">Browse Files</button>
@@ -3701,11 +3701,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     if (db.clientQrNotifyEmail) {
                         localStorage.setItem(CLIENT_QR_NOTIFY_EMAIL_KEY, db.clientQrNotifyEmail);
                     }
-                    yardDb = {
+					yardDb = {
                         containers: cloudYard.containers || yardDb.containers || [],
                         movements: cloudYard.movements || yardDb.movements || [],
-                        revenues: cloudYard.revenues || yardDb.revenues || [],
-                        expenses: cloudYard.expenses || yardDb.expenses || []
+                        revenues: Array.isArray(cloudYard.revenues) ? cloudYard.revenues : (yardDb.revenues || []),
+                        expenses: Array.isArray(cloudYard.expenses) ? cloudYard.expenses : (yardDb.expenses || [])
                     };
                 } else if (!isClientQrMode) {
                     await saveCloudData();
@@ -4009,10 +4009,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'geofence_zones' }, () => { if (!isSavingCloudData) fetchLogiTrackDataFromSupabase(); });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'fleet_expenses' }, () => { if (!isSavingCloudData) fetchFleetExpensesFromSupabase(); });
-                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_expenses' }, () => { if (!isSavingCloudData) fetchYardExpensesFromSupabase(); });
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_expenses' }, () => {
+                    if (isSavingCloudData || (Date.now() - lastLocalSaveTimestamp < 2500)) return;
+                    fetchYardExpensesFromSupabase();
+                });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_logs' }, () => { if (!isSavingCloudData) fetchMaintenanceLogsFromSupabase(); });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_containers' }, scheduleRealtimeYardSync);
-                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_revenues' }, scheduleRealtimeYardSync);
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_revenues' }, () => {
+                    if (isSavingCloudData || (Date.now() - lastLocalSaveTimestamp < 2500)) return;
+                    scheduleRealtimeYardSync();
+                });
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_movements' }, scheduleRealtimeYardSync);
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'hub_locations' }, () => { if (!isSavingCloudData) fetchHubLocationsFromSupabase(); });
 
@@ -4317,7 +4323,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     }
                 } catch (storageResetErr) {}
 
-                const { data: resetSummary, error: rpcErr } = await supabaseClient.rpc('skymover_admin_reset_scope', {
+				const { data: resetSummary, error: rpcErr } = await supabaseClient.rpc('skymover_admin_reset_scope', {
                     p_scope: 'empty_yard',
                     p_log_summary: true
                 });
@@ -4325,7 +4331,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if (!rpcErr && resetSummary && resetSummary.deleted_rows_by_table) {
                     clearedTablesCount = Object.keys(resetSummary.deleted_rows_by_table).length;
                 } else {
-                    const yardTables = ['yard_containers', 'yard_revenues', 'yard_movements', 'yard_expenses'];
+                    const yardTables = ['yard_containers', 'yard_revenues', 'yard_movements', 'yard_expenses', 'gate_notifications'];
                     for (const tbl of yardTables) {
                         try {
                             const { error } = await supabaseClient.from(tbl).delete().not('id', 'is', null);
@@ -4333,11 +4339,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         } catch (e) {}
                     }
                 }
+
+                // Ensure Client QR gate_notifications are also cleared even when RPC runs
+                try {
+                    await supabaseClient.from('gate_notifications').delete().not('id', 'is', null);
+                } catch (e) {}
             }
 
             yardDb = { containers: [], movements: [], revenues: [], expenses: [] };
+            pendingClientGateNotifications = [];
             stagedGateInPhotos = [];
             stagedGateOutPhotos = [];
+            stagedDriverProofPhotos = [];
+            clearGateInPhotos();
+            clearGateOutPhotos();
 
             safeLocalStorageSet(YARD_KEY, yardDb);
 
@@ -4354,14 +4369,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
             lastLocalSaveTimestamp = Date.now();
             setTimeout(() => { isSavingCloudData = false; }, 1000);
 
+            populateYardOutContainerDropdown();
+            renderClientGateNotificationsTable();
+            const pendingBadge = document.getElementById('clientQrPendingCountBadge');
+            if (pendingBadge) pendingBadge.textContent = '0';
+            refreshYardDashboard();
             refreshYard();
             renderYardRevenue();
             renderYardExpenses();
             renderYardReports();
 
-            alert(`🔄 Empty Yard reset complete! A safety backup was downloaded, ${clearedTablesCount} Empty Yard cloud table(s) and ${removedStorageCount} storage file(s) in skymover-attachments were deleted, and all Management Backend & Driver's Side records remain untouched.`);
+            alert(`🔄 Empty Yard reset complete! A safety backup was downloaded, ${clearedTablesCount} Empty Yard cloud table(s) and ${removedStorageCount} storage file(s) in skymover-attachments were zeroed out, and all Management Backend & Driver's Side records remain untouched.`);
         }
-
+		
         function openGeofenceSmsModal() {
             if (!requireAdminExecution("configure Geofence Zones & SMS Templates")) return;
             const modal = document.getElementById('geofenceSmsConfigModal');
@@ -5433,9 +5453,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const previewContainer = document.getElementById(containerId);
             if(!previewContainer) return;
 
-            for (let file of files) {
-					if (file.size > 10 * 1024 * 1024) {
-					    alert(`⚠️ "${file.name}" exceeds the 10 MB file size limit and was skipped.`);
+			for (let file of files) {
+					if (file.size > 30 * 1024 * 1024) {
+					    alert(`⚠️ "${file.name}" exceeds the 30 MB file size limit and was skipped.`);
 					    continue;
 					}		
                 const optimizedFile = await compressImageFile(file);
@@ -6822,7 +6842,75 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 alert(`✅ Removed "${targetEmail}" from RBAC Users.\n\nℹ️ Database Auth Note: Browser anon keys cannot delete auth.users directly without a server-side RPC.`);
             }
 
-            openSubModule('User Management');
+			openSubModule('User Management');
+        }
+
+        async function reconcileRbacUsersFromAuth(knownUsersList = null) {
+            if (!requireAdminExecution("reconcile RBAC users with Authentication")) return;
+            if (!Array.isArray(db.systemUsers)) db.systemUsers = [];
+
+            const existingByEmail = new Map(
+                db.systemUsers
+                    .filter(u => u && u.email)
+                    .map(u => [String(u.email).trim().toLowerCase(), u])
+            );
+
+            let authRows = Array.isArray(knownUsersList) ? knownUsersList : [];
+
+            // Optional RPC if you create a SECURITY DEFINER function `admin_list_auth_users()` returning (id, email, role, created_at)
+            if (!authRows.length && supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.rpc('admin_list_auth_users');
+                    if (!error && Array.isArray(data)) {
+                        authRows = data;
+                    }
+                } catch (_) {
+                    // RPC not created yet; fall back to current session user + manual/known entries
+                }
+            }
+
+            if (!authRows.length && currentUser && currentUser.email) {
+                authRows.push({
+                    id: currentUser.id,
+                    email: currentUser.email,
+                    role: resolveUserRoleFromAuthUser(currentUser),
+                    created_at: currentUser.created_at || new Date().toISOString()
+                });
+            }
+
+            let addedCount = 0;
+            for (const row of authRows) {
+                const email = String(row.email || '').trim().toLowerCase();
+                if (!email) continue;
+                const normalizedRole = ['admin', 'dispatcher', 'yard_manager', 'accounting_reports', 'driver'].includes(String(row.role || '').toLowerCase())
+                    ? String(row.role).toLowerCase()
+                    : 'dispatcher';
+
+                if (!existingByEmail.has(email)) {
+                    const entry = {
+                        id: row.id || null,
+                        email,
+                        role: normalizedRole,
+                        createdAt: row.created_at || new Date().toISOString()
+                    };
+                    db.systemUsers.push(entry);
+                    existingByEmail.set(email, entry);
+                    addedCount++;
+                } else if (row.id && !existingByEmail.get(email).id) {
+                    existingByEmail.get(email).id = row.id;
+                }
+            }
+
+            if (addedCount > 0) {
+                await saveCloudData();
+                alert(`✅ Synced ${addedCount} missing user(s) into RBAC User & Role Management.`);
+            } else if (!Array.isArray(knownUsersList)) {
+                alert('ℹ️ RBAC list is up to date with accessible auth records. To import users created directly in Supabase Auth without an RPC, pass their email/role or add them via "+ Register New User".');
+            }
+
+            if (currentBackendModuleType === 'User Management') {
+                openSubModule('User Management');
+            }
         }
 
         function switchAiTab(tab) {
@@ -7558,15 +7646,20 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     </tr>
                 `).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500 font-medium">No RBAC users provisioned in list yet.</td></tr>';
 
-                content.innerHTML = `
+				content.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
                         <div>
-                            <h3 class="text-xl font-bold"><i class="fa-solid fa-user-shield text-sky-400 mr-2"></i> RBAC User & Role Management</h3>
+                            <h3 class="text-xl font-bold"><i class="fa-solid fa-user-shield text-sky-400 mr-2"></i> RBAC User & Role Management (${users.length})</h3>
                             <p class="text-xs text-slate-300">Provision user accounts and assign role-based access levels across Skymover.</p>
                         </div>
-                        <button onclick="openNewUserRegistrationModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">
-                            + Register New User
-                        </button>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="reconcileRbacUsersFromAuth()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold border border-slate-600">
+                                <i class="fa-solid fa-rotate mr-1"></i> Sync Auth Users
+                            </button>
+                            <button onclick="openNewUserRegistrationModal()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold">
+                                + Register New User
+                            </button>
+                        </div>
                     </div>
                     <div class="overflow-x-auto bg-white text-slate-900 rounded-xl p-3">
                         <table class="w-full text-left text-xs">
@@ -8347,18 +8440,34 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		async function fetchYardExpensesFromSupabase() {
             if (!supabaseClient) return;
             try {
-                const { data, error } = await supabaseClient.from('yard_expenses').select('*').order('expense_date', { ascending: false });
+                const { data, error } = await supabaseClient
+                    .from('yard_expenses')
+                    .select('*')
+                    .order('expense_date', { ascending: false });
                 if (error) return;
-                if (data && data.length > 0) {
+
+                if (Array.isArray(data)) {
                     const cloudYardExp = data.map(ex => ({
                         id: ex.id,
                         category: ex.category,
                         description: ex.description,
                         amount: Number(ex.amount || 0),
-                        date: ex.expense_date ? formatIsoToLocalDateTimeInput(ex.expense_date) : formatIsoToLocalDateTimeInput(new Date().toISOString())
+                        date: ex.expense_date
+                            ? formatIsoToLocalDateTimeInput(ex.expense_date)
+                            : formatIsoToLocalDateTimeInput(new Date().toISOString())
                     }));
-                    yardDb.expenses = mergeRecordsSafely(yardDb.expenses, cloudYardExp, ex => ex.id ? `id:${ex.id}` : `key:${ex.date}_${ex.description}_${ex.amount}`);
+
+                    const cloudIds = new Set(cloudYardExp.map(ex => String(ex.id)));
+                    // Keep only local rows that have no `id` yet (offline/unassigned); drop any `id`'d row absent from `yard_expenses`
+                    const unsyncedLocal = (yardDb.expenses || []).filter(
+                        localEx => localEx && (localEx.id === undefined || localEx.id === null)
+                    );
+
+                    yardDb.expenses = [...cloudYardExp, ...unsyncedLocal];
+                    deduplicateAllCollections();
+                    safeLocalStorageSet(YARD_KEY, yardDb);
                 }
+
                 renderYardExpenses();
                 renderYardRevenue();
             } catch (err) {}
@@ -8414,20 +8523,44 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (err) { return false; }
         }
 
-        async function deleteYardExpenseEntry(index) {
+		async function deleteYardExpenseEntry(index) {
             if (!requireAdminExecution("delete a Yard Operating Expense")) return;
             const expenses = yardDb.expenses || [];
             const target = expenses[index];
             if (!target) return;
             if (!confirm(`Are you sure you want to permanently delete the expense "${target.description}" (₱${Number(target.amount || 0).toLocaleString()})?`)) return;
 
-            if (supabaseClient && target.id) {
-                try { await supabaseClient.from('yard_expenses').delete().eq('id', target.id); } catch (err) {}
+            isSavingCloudData = true;
+            lastLocalSaveTimestamp = Date.now();
+
+            try {
+                if (supabaseClient) {
+                    let delQuery = supabaseClient.from('yard_expenses').delete();
+                    if (target.id !== undefined && target.id !== null) {
+                        delQuery = delQuery.eq('id', target.id);
+                    } else {
+                        delQuery = delQuery
+                            .eq('category', target.category || '')
+                            .eq('description', target.description || '')
+                            .eq('amount', parseFloat(target.amount) || 0);
+                    }
+                    const { error: delErr } = await delQuery;
+                    if (delErr) {
+                        alert(`❌ Could not delete from cloud yard_expenses: ${delErr.message}`);
+                        return;
+                    }
+                }
+
+                yardDb.expenses.splice(index, 1);
+                safeLocalStorageSet(YARD_KEY, yardDb);
+                renderYardExpenses();
+                renderYardRevenue();
+
+                await saveCloudData();
+            } finally {
+                lastLocalSaveTimestamp = Date.now();
+                setTimeout(() => { isSavingCloudData = false; }, 1000);
             }
-            yardDb.expenses.splice(index, 1);
-            await saveCloudData();
-            renderYardExpenses();
-            renderYardRevenue();
         }
 
         async function fetchMaintenanceLogsFromSupabase() {
@@ -8615,8 +8748,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		async function fetchYardRevenuesFromSupabase() {
             if (!supabaseClient) return;
             try {
-                const { data, error } = await supabaseClient.from('yard_revenues').select('*').order('transaction_date', { ascending: false });
-                if (!error && data && data.length > 0) {
+                const { data, error } = await supabaseClient
+                    .from('yard_revenues')
+                    .select('*')
+                    .order('transaction_date', { ascending: false });
+                if (error) return;
+
+                if (Array.isArray(data)) {
                     const cloudRevs = data.map(r => ({
                         id: r.id,
                         date: formatIsoToLocalDateTimeInput(r.transaction_date),
@@ -8625,10 +8763,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
                         eir: r.eir_ref || '—',
                         amount: Number(r.amount || 0)
                     }));
-                    yardDb.revenues = mergeRecordsSafely(yardDb.revenues, cloudRevs, r => r.id ? `id:${r.id}` : `rev:${r.source}_${r.container}_${r.date}_${r.amount}`);
-                    renderYardRevenue();
-                    refreshYardDashboard();
+
+                    // Keep only unsynced local rows (no `id` yet); drop any `id`'d row no longer in `yard_revenues`
+                    const unsyncedLocal = (yardDb.revenues || []).filter(
+                        localR => localR && (localR.id === undefined || localR.id === null)
+                    );
+
+                    yardDb.revenues = [...cloudRevs, ...unsyncedLocal];
+                    deduplicateAllCollections();
+                    safeLocalStorageSet(YARD_KEY, yardDb);
                 }
+
+                renderYardRevenue();
+                refreshYardDashboard();
             } catch (e) {}
         }
 		
@@ -8723,26 +8870,44 @@ Skymover Transport is not liable for charges incurred due to operational constra
             } catch (e) { return false; }
         }
 
-        async function deleteYardRevenueEntry(index) {
+		async function deleteYardRevenueEntry(index) {
             if (!requireAdminExecution("delete a Yard Revenue record")) return;
             const revenues = yardDb.revenues || [];
             const target = revenues[index];
             if (!target) return;
             if (!confirm(`Are you sure you want to permanently delete this revenue record for Container ${target.container} (₱${Number(target.amount || 0).toLocaleString()})?`)) return;
 
-            if (supabaseClient) {
-                try {
-                    if (target.id) await supabaseClient.from('yard_revenues').delete().eq('id', target.id);
-                    else if (target.container && target.amount !== undefined) {
-                        await supabaseClient.from('yard_revenues').delete().eq('container_number', target.container).eq('amount', parseFloat(target.amount) || 0);
-                    }
-                } catch (err) {}
-            }
+            isSavingCloudData = true;
+            lastLocalSaveTimestamp = Date.now();
 
-            yardDb.revenues.splice(index, 1);
-            await saveCloudData();
-            renderYardRevenue();
-            refreshYardDashboard();
+            try {
+                if (supabaseClient) {
+                    let delQuery = supabaseClient.from('yard_revenues').delete();
+                    if (target.id !== undefined && target.id !== null) {
+                        delQuery = delQuery.eq('id', target.id);
+                    } else {
+                        delQuery = delQuery
+                            .eq('source_type', target.source || '')
+                            .eq('container_number', target.container || '')
+                            .eq('amount', parseFloat(target.amount) || 0);
+                    }
+                    const { error: delErr } = await delQuery;
+                    if (delErr) {
+                        alert(`❌ Could not delete from cloud yard_revenues: ${delErr.message}`);
+                        return;
+                    }
+                }
+
+                yardDb.revenues.splice(index, 1);
+                safeLocalStorageSet(YARD_KEY, yardDb);
+                renderYardRevenue();
+                refreshYardDashboard();
+
+                await saveCloudData();
+            } finally {
+                lastLocalSaveTimestamp = Date.now();
+                setTimeout(() => { isSavingCloudData = false; }, 1000);
+            }
         }
 
         async function deleteYardMovementEntry(index) {
@@ -10109,10 +10274,11 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     ? `<span class="font-bold text-slate-900">${escapeHtml(req.waiver_signature)}</span>`
                     : '<span class="text-slate-400 italic">N/A</span>';
 
+				const viewBtn = `<button type="button" onclick="openClientGateNotificationModal(${Number(idx)})" class="bg-sky-100 hover:bg-sky-200 text-sky-900 px-2.5 py-1 rounded font-bold text-[10px] mr-1">View</button>`;
                 const actionsHtml = canReview
-                    ? `<button type="button" onclick="acceptClientGateNotification(${Number(idx)})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px] mr-1">Accept</button>
+                    ? `${viewBtn}<button type="button" onclick="acceptClientGateNotification(${Number(idx)})" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded font-bold text-[10px] mr-1">Accept</button>
                        <button type="button" onclick="rejectClientGateNotification(${Number(idx)})" class="bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-bold text-[10px]">Reject</button>`
-                    : '<span class="text-[10px] text-slate-400">Read Only</span>';
+                    : `${viewBtn}<span class="text-[10px] text-slate-400">Read Only</span>`;
 
                 return `
                     <tr class="border-b hover:bg-slate-50">
@@ -10127,6 +10293,88 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }).join('');
         }
 
+		function openClientGateNotificationModal(idx) {
+            const req = pendingClientGateNotifications[idx];
+            if (!req) {
+                showSkymoverNotice('Pending Client QR submission not found.', 'warning');
+                return;
+            }
+
+            const modal = document.getElementById('subModuleModal');
+            const content = document.getElementById('subModuleContent');
+            if (!modal || !content) return;
+
+            const cleanNo = String(req.container_number || '').trim().toUpperCase();
+            const isGateIn = String(req.movement_type || 'GATE_IN').toUpperCase().includes('IN');
+
+            // Collect attachments from notification row or matching pending yard_containers row
+            let photos = Array.isArray(req.photos) ? [...req.photos] : [];
+            if (photos.length === 0 && Array.isArray(yardDb?.containers)) {
+                const matchedYardRow = yardDb.containers.find(
+                    c => String(c.number || '').trim().toUpperCase() === cleanNo && Array.isArray(c.photos) && c.photos.length > 0
+                );
+                if (matchedYardRow) photos = [...matchedYardRow.photos];
+            }
+
+            const fmtDt = (val) => {
+                if (!val) return '—';
+                const d = new Date(val);
+                return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+            };
+
+            content.innerHTML = `
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4 text-white">
+                    <div>
+                        <h3 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-qrcode text-sky-400"></i>
+                            Client QR Submission (${escapeHtml(req.movement_type || 'GATE_IN')}): <span class="font-mono text-amber-300">${escapeHtml(cleanNo)}</span>
+                        </h3>
+                        <p class="text-xs text-slate-300 mt-0.5">
+                            Status: <strong class="text-white">${escapeHtml(req.review_status || req.status || 'Pending Review')}</strong>
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeSubModule()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-700">
+                        Close
+                    </button>
+                </div>
+
+                <div class="bg-white text-slate-900 rounded-2xl p-5 space-y-4 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
+                        <div><span class="text-slate-500 font-semibold">Container No.:</span> <strong class="font-mono">${escapeHtml(cleanNo)}</strong></div>
+                        <div><span class="text-slate-500 font-semibold">Movement Type:</span> <strong>${escapeHtml(req.movement_type || '—')}</strong></div>
+                        ${isGateIn ? `
+                            <div><span class="text-slate-500 font-semibold">Size / Type:</span> <strong>${escapeHtml(req.size || '—')} / ${escapeHtml(req.container_type || 'Dry')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Shipping Line:</span> <strong>${escapeHtml(req.shipping_line || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Trucking Name:</span> <strong>${escapeHtml(req.trucking_name || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Truck Plate:</span> <strong class="font-mono">${escapeHtml(req.truck_plate_number || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Driver Name:</span> <strong>${escapeHtml(req.driver_name || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Equipment:</span> <strong>${escapeHtml(req.equipment || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">EIR / Ref:</span> <strong class="font-mono">${escapeHtml(req.eir_ref || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Condition / Slot:</span> <strong>${escapeHtml(req.condition || 'Good')} • ${escapeHtml(req.block || 'A')}/${escapeHtml(req.bay || 'BAY-1')}/${escapeHtml(req.yard_row || 'GROUND')}/T${escapeHtml(req.tier || '1')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Gate-In Date/Time:</span> <strong class="font-mono">${escapeHtml(fmtDt(req.gate_in_date))} (${escapeHtml(req.gate_in_tod || '—')})</strong></div>
+                            <div><span class="text-slate-500 font-semibold">ETA Arrival:</span> <strong class="font-mono">${escapeHtml(fmtDt(req.eta_date))}</strong></div>
+                        ` : `
+                            <div><span class="text-slate-500 font-semibold">Release To / Customer:</span> <strong>${escapeHtml(req.release_to_customer || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Truck Plate:</span> <strong class="font-mono">${escapeHtml(req.truck_plate_number || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Driver Name:</span> <strong>${escapeHtml(req.driver_name || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Equipment:</span> <strong>${escapeHtml(req.equipment || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">Gate-Out EIR / Ref:</span> <strong class="font-mono">${escapeHtml(req.gate_out_eir_ref || '—')}</strong></div>
+                            <div><span class="text-slate-500 font-semibold">ETA Pull-Out:</span> <strong class="font-mono">${escapeHtml(fmtDt(req.eta_pullout_datetime))} (${escapeHtml(req.gate_out_time_of_day || '—')})</strong></div>
+                        `}
+                        <div class="sm:col-span-2"><span class="text-slate-500 font-semibold">Waiver Signature:</span> <strong>${escapeHtml(req.waiver_signature || 'N/A')}</strong> <span class="font-mono text-[10px] text-slate-500">(${escapeHtml(fmtDt(req.waiver_signed_at))})</span></div>
+                        <div class="sm:col-span-2"><span class="text-slate-500 font-semibold">Remarks:</span> <span>${escapeHtml(req.remarks || '—')}</span></div>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-xl p-4">
+                        <div class="font-bold text-slate-800 mb-2">Client Attachments (${photos.length})</div>
+                        <div>${renderPhotoThumbnailsForReport(photos, 'No attachments uploaded')}</div>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+		
 		function canReviewClientQrSubmissions() {
             if (currentUserRole === 'admin' && !isClientQrMode) return true;
             if (isClientQrMode) return false;
@@ -10398,9 +10646,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                remarks: (formData.get('remarks') || '').trim(),
 			                van_in_amount: null,
 			                van_in_status: 'PENDING_REVIEW',
-			                waiver_accepted: true,
+							waiver_accepted: true,
 			                waiver_signature: waiverSignature,
-			                waiver_signed_at: signedAtIso
+			                waiver_signed_at: signedAtIso,
+			                photos: [...stagedGateInPhotos]
 			            };
 			
 						if (supabaseClient) {
@@ -10728,10 +10977,12 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			                driver_name: driver,
 							equipment: equipment,
 			                gate_out_eir_ref: eirRef,
-			                eta_pullout_datetime: new Date(etaPulloutDate).toISOString(),
+							eta_pullout_datetime: new Date(etaPulloutDate).toISOString(),
 			                gate_out_time_of_day: gateOutToD,
 			                van_in_amount: null,
-			                van_in_status: 'PENDING_REVIEW'
+			                van_in_status: 'PENDING_REVIEW',
+			                remarks: remarks || null,
+			                photos: [...stagedGateOutPhotos]
 			            };
 			
 			            if (supabaseClient) {
