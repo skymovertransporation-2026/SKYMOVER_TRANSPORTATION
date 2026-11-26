@@ -6811,26 +6811,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             let authRows = Array.isArray(knownUsersList) ? knownUsersList : [];
 
-			// Optional RPC if you create a SECURITY DEFINER function `admin_list_auth_users()` returning (id, email, role, created_at)
-            if (!authRows.length && supabaseClient && window.__skymoverHasListAuthUsersRpc !== false) {
+			// Optional RPC if you create a SECURITY DEFINER function `admin_list_auth_users()` returning (id, email, role, created_at).
+            // Defaults to false so no 404 is emitted unless explicitly enabled after creating the SQL RPC.
+            if (!authRows.length && supabaseClient && window.__skymoverHasListAuthUsersRpc === true) {
                 try {
                     const { data, error } = await supabaseClient.rpc('admin_list_auth_users');
                     if (error) {
-                        const isMissingRpc =
-                            error.status === 404 ||
-                            error.code === 'PGRST202' ||
-                            /admin_list_auth_users|could not find the function|404/i.test(error.message || '');
-                        if (isMissingRpc) {
-                            window.__skymoverHasListAuthUsersRpc = false;
-                        } else {
-                            console.warn('admin_list_auth_users RPC notice:', error.message);
-                        }
+                        console.warn('admin_list_auth_users RPC notice:', error.message);
                     } else if (Array.isArray(data)) {
-                        window.__skymoverHasListAuthUsersRpc = true;
                         authRows = data;
                     }
                 } catch (_) {
-                    // RPC not created yet; fall back to current session user + manual/known entries
+                    // Fall back to current session user + manual/known entries
                 }
             }
 
