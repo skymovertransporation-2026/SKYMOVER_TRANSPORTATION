@@ -2906,6 +2906,77 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
+		async function runAdminStorageSmokeTest() {
+            if (!requireAdminExecution("run the storage bucket smoke test")) return null;
+            if (!supabaseClient) {
+                console.warn("Supabase client not initialized.");
+                return null;
+            }
+
+            const testPath = `gate-in/__admin_smoke_${Date.now()}.txt`;
+            const blob = new Blob(["admin storage test"], { type: "text/plain" });
+
+            const { data: upData, error: upErr } = await supabaseClient.storage
+                .from(STORAGE_BUCKET_NAME)
+                .upload(testPath, blob, { upsert: true });
+            console.log("Upload:", { upData, upErr });
+
+            const { data: listData, error: listErr } = await supabaseClient.storage
+                .from(STORAGE_BUCKET_NAME)
+                .list("gate-in", { limit: 20 });
+            console.log("List:", { found: listData?.some(f => f.name === testPath.split("/")[1]), listErr });
+
+            const { data: delData, error: delErr } = await supabaseClient.storage
+                .from(STORAGE_BUCKET_NAME)
+                .remove([testPath]);
+            console.log("Remove:", { delData, delErr });
+
+            return { upData, upErr, listErr, delData, delErr };
+        }
+
+		async function runFullAdminStorageSmokeTest() {
+            if (!requireAdminExecution("run the full storage bucket smoke test")) return null;
+            if (!supabaseClient) {
+                console.warn("Supabase client not initialized.");
+                return null;
+            }
+
+            const bucket = typeof STORAGE_BUCKET_NAME !== "undefined" ? STORAGE_BUCKET_NAME : "skymover-attachments";
+            const folder = "gate-in";
+            const fileName = `__admin_smoke_${Date.now()}.txt`;
+            const filePath = `${folder}/${fileName}`;
+            const blob = new Blob(["SKYMOVER admin storage smoke test"], { type: "text/plain" });
+
+            // 1. Upload
+            const { data: upData, error: upErr } = await supabaseClient.storage
+                .from(bucket)
+                .upload(filePath, blob, { cacheControl: "3600", upsert: true });
+            console.log("1. Upload:", { upData, upErr });
+            if (upErr) return { upData, upErr };
+
+            // 2. List
+            const { data: listData, error: listErr } = await supabaseClient.storage
+                .from(bucket)
+                .list(folder, { limit: 50, search: "__admin_smoke_" });
+            const foundInList = Array.isArray(listData) && listData.some((item) => item.name === fileName);
+            console.log("2. List:", { foundInList, listErr, matches: listData });
+
+            // 3. Delete (remove)
+            const { data: delData, error: delErr } = await supabaseClient.storage
+                .from(bucket)
+                .remove([filePath]);
+            console.log("3. Remove:", { delData, delErr });
+
+            // 4. Confirm removed
+            const { data: verifyList, error: verifyErr } = await supabaseClient.storage
+                .from(bucket)
+                .list(folder, { limit: 50, search: "__admin_smoke_" });
+            const stillExists = Array.isArray(verifyList) && verifyList.some((item) => item.name === fileName);
+            console.log("4. Post-Delete Check:", { stillExists, verifyErr });
+
+            return { upData, upErr, foundInList, listErr, delData, delErr, stillExists, verifyErr };
+        }
+		
         // ==========================================
         // AUTOMATED PHOTO COMPRESSION UTILITY
         // ==========================================
