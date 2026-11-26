@@ -2906,34 +2906,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-		async function runAdminStorageSmokeTest() {
-            if (!requireAdminExecution("run the storage bucket smoke test")) return null;
-            if (!supabaseClient) {
-                console.warn("Supabase client not initialized.");
-                return null;
-            }
-
-            const testPath = `gate-in/__admin_smoke_${Date.now()}.txt`;
-            const blob = new Blob(["admin storage test"], { type: "text/plain" });
-
-            const { data: upData, error: upErr } = await supabaseClient.storage
-                .from(STORAGE_BUCKET_NAME)
-                .upload(testPath, blob, { upsert: true });
-            console.log("Upload:", { upData, upErr });
-
-            const { data: listData, error: listErr } = await supabaseClient.storage
-                .from(STORAGE_BUCKET_NAME)
-                .list("gate-in", { limit: 20 });
-            console.log("List:", { found: listData?.some(f => f.name === testPath.split("/")[1]), listErr });
-
-            const { data: delData, error: delErr } = await supabaseClient.storage
-                .from(STORAGE_BUCKET_NAME)
-                .remove([testPath]);
-            console.log("Remove:", { delData, delErr });
-
-            return { upData, upErr, listErr, delData, delErr };
-        }
-
 		async function runFullAdminStorageSmokeTest() {
             if (!requireAdminExecution("run the full storage bucket smoke test")) return null;
             if (!supabaseClient) {
