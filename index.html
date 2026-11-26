@@ -6677,17 +6677,34 @@ Skymover Transport is not liable for charges incurred due to operational constra
 					if (error) {
 		                const status = error.context?.status;
 		                let detailedMsg = error.message || 'Failed to provision user';
+		                let errBody = null;
 		                try {
 		                    if (error.context && typeof error.context.json === 'function') {
-		                        const errBody = await error.context.json();
-		                        if (errBody?.error) detailedMsg = `${errBody.error} (HTTP ${status || 'error'})`;
+		                        errBody = await error.context.json();
+		                        const msgFromBody = errBody?.error || errBody?.message;
+		                        if (msgFromBody) {
+		                            detailedMsg = status ? `${msgFromBody} (HTTP ${status})` : msgFromBody;
+		                        }
 		                    }
 		                } catch (_) {}
-		
-		                if (status === 504) {
-		                    alert("Database Auth Notice: HTTP 504 (Request timed out on the server/email/hook). Check Supabase Auth Logs & Edge Function logs before retrying.");
+
+		                const isTimeout =
+		                    status === 504 ||
+		                    status === 408 ||
+		                    /timeout|timed out|gateway timeout/i.test(detailedMsg);
+
+		                if (isTimeout) {
+		                    alert(
+		                        `Database Auth Notice: ${detailedMsg} (Request timed out on Auth/SMTP/hook). ` +
+		                        `Check if "${email}" was already created in Supabase Auth Users before retrying.`
+		                    );
 		                } else {
 		                    alert("Database Auth Notice: " + detailedMsg);
+		                }
+
+		                if (submitBtn) {
+		                    submitBtn.disabled = false;
+		                    submitBtn.textContent = 'Create User Account';
 		                }
 		                return;
 		            }
