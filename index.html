@@ -2486,18 +2486,18 @@ Skymover Transport is not liable for charges incurred due to operational constra
         // ==========================================
         // ROW PERSISTENCE & STORAGE QUOTA PROTECTION
         // ==========================================
-        function stripLargeBase64ForCache(obj) {
-            try {
-                return JSON.parse(JSON.stringify(obj, (key, value) => {
-                    if (key === 'dataUrl' && typeof value === 'string' && value.startsWith('data:') && value.length > 60000) {
-                        return '';
-                    }
-                    return value;
-                }));
-            } catch (e) {
-                return obj;
-            }
-        }
+		function stripLargeBase64ForCache(obj) {
+		    try {
+		        return JSON.parse(JSON.stringify(obj, (key, value) => {
+		            if (typeof value === 'string' && value.startsWith('data:')) {
+		                return '';
+		            }
+		            return value;
+		        }));
+		    } catch (e) {
+		        return obj;
+		    }
+		}
 
         function safeLocalStorageSet(key, dataObj) {
             try {
@@ -4031,10 +4031,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
 				if(supabaseClient && !isClientQrMode) {
                     try {
+                        const leanPayload = stripLargeBase64ForCache({
+                            managementBackend: db,
+                            emptyYard: yardDb
+                        });
                         await runWithTimeoutAndRetry(
                             () => supabaseClient.from('skymover_enterprise_db').upsert({
                                 id: 1,
-                                payload: { managementBackend: db, emptyYard: yardDb },
+                                payload: leanPayload,
                                 updated_at: new Date().toISOString()
                             }, { onConflict: 'id' }),
                             { timeoutMs: 12000, retries: 2, actionLabel: 'save enterprise database state' }
@@ -6565,62 +6569,21 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		    dlAnchor.remove();
 		    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 		
-		    // 3. Ask whether to clean ALL logs or only logs older than N days across both tables
-		    const modeInput = prompt(
+		    // 3. Confirm full wipe of ALL audit records after backup download
+		    const confirmText =
 		        `✅ Combined JSON backup downloaded (${totalCount} total row(s): ${auditData.length} in audit_logs, ${skymoverData.length} in skymover_audit_logs).\n\n` +
-		        `Choose cleanup option for BOTH audit tables:\n` +
-		        `• Type ALL to delete all ${totalCount} audit log row(s)\n` +
-		        `• Or enter a number of days (e.g. 30) to delete logs older than that many days\n` +
-		        `• Or click Cancel to keep all logs in Supabase`,
-		        "30"
-		    );
-		
-		    if (modeInput === null) return;
-		    const trimmed = modeInput.trim();
-		    if (!trimmed) return;
-		
-		    let confirmText = "";
-		    let deleteAll = false;
-		    let cutoffIso = null;
-		
-		    if (trimmed.toUpperCase() === "ALL") {
-		        deleteAll = true;
-		        confirmText = `⚠️ Permanently delete ALL ${totalCount} audit log record(s) from BOTH public.audit_logs and public.skymover_audit_logs?`;
-		    } else {
-		        const days = parseInt(trimmed, 10);
-		        if (isNaN(days) || days < 1) {
-		            alert('⚠️ Enter ALL or a valid positive number of days (e.g. 30).');
-		            return;
-		        }
-		        cutoffIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-		        confirmText = `⚠️ Permanently delete audit logs older than ${days} day(s) (before ${new Date(cutoffIso).toLocaleString()}) from BOTH public.audit_logs and public.skymover_audit_logs?`;
-		    }
-		
+		        `⚠️ Permanently delete ALL ${totalCount} audit log record(s) from BOTH public.audit_logs and public.skymover_audit_logs?`;
 		    if (!confirm(confirmText)) return;
-		
-		    const cleanOneTable = async (tblName, tsCol) => {
-		        let q = supabaseClient.from(tblName).delete();
-		        if (deleteAll) {
-		            q = q.not('id', 'is', null);
-		        } else {
-		            q = q.lt(tsCol, cutoffIso);
-		        }
-		        const { error } = await q;
+
+			const cleanOneTable = async (tblName) => {
+		        const { error } = await supabaseClient.from(tblName).delete().not('id', 'is', null);
 		        if (!error) return { ok: true, error: null };
-		
-		        // Fallback if timestamp column is created_at instead of changed_at
-		        if (!deleteAll && tsCol === 'changed_at') {
-		            let q2 = supabaseClient.from(tblName).delete().lt('created_at', cutoffIso);
-		            const res2 = await q2;
-		            if (!res2.error) return { ok: true, error: null };
-		            return { ok: false, error: res2.error.message };
-		        }
 		        return { ok: false, error: error.message };
 		    };
 		
 		    const [delAudit, delSkymover] = await Promise.all([
-		        cleanOneTable('audit_logs', 'changed_at'),
-		        cleanOneTable('skymover_audit_logs', 'changed_at')
+		        cleanOneTable('audit_logs'),
+		        cleanOneTable('skymover_audit_logs')
 		    ]);
 		
 		    if (!delAudit.ok || !delSkymover.ok) {
@@ -10867,13 +10830,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
         }
 
-        function populateYardOutContainerDropdown() {
+		function populateYardOutContainerDropdown() {
             const select = document.getElementById('yardOutContainer');
             if(!select) return;
             const availableContainers = (yardDb.containers || []).filter(c => c.status !== 'Released');
-            select.innerHTML = '<option value="">Select container in yard</option>' + availableContainers.map(c => `
-                <option value="${c.number}">${c.number} (${c.size} - ${c.line} • Plate: ${c.plate})</option>
-            `).join('');
+            select.innerHTML = '<option value="">Select container in yard</option>' + availableContainers.map(c => {
+                const rejectedTag = c.rejectedGateOut ? ' [⚠️ Rejected / Needs Revision]' : '';
+                return `<option value="${escapeAttr(c.number)}">${escapeHtml(c.number)} (${escapeHtml(c.size)} - ${escapeHtml(c.line)} • Plate: ${escapeHtml(c.plate)})${escapeHtml(rejectedTag)}</option>`;
+            }).join('');
         }
 
         function containerSelectedForGateOut() {
@@ -10884,12 +10848,38 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const vanInAmountInput = document.getElementById('calcVanInAmount');
             const gateInDisplay = document.getElementById('calcGateInDisplay');
 
-            const match = (yardDb.containers || []).find(c => c.number === containerNo && c.status !== 'Released');
+			const match = (yardDb.containers || []).find(c => c.number === containerNo && c.status !== 'Released');
             if (match) {
                 if(plateInput) plateInput.value = match.plate || '';
                 if(driverInput) driverInput.value = match.driver || '';
                 if(vanInAmountInput) vanInAmountInput.value = match.vanInAmount || 0;
                 if(gateInDisplay) gateInDisplay.value = match.date || '';
+
+                if (match.rejectedGateOut && match.rejectedGateOut.previousDetails) {
+                    const prev = match.rejectedGateOut.previousDetails;
+                    const custEl = document.getElementById('gateOutCustomer');
+                    const eqEl = document.getElementById('gateOutEquipment');
+                    const eirEl = document.getElementById('gateOutEir');
+                    const vanOutEl = document.getElementById('calcVanOutAmount');
+                    const rateEl = document.getElementById('calcStorageAmount');
+                    const etaPullEl = document.getElementById('gateOutETADateInput');
+                    const todEl = document.getElementById('gateOutToD');
+                    const remEl = document.getElementById('gateOutRemarks');
+
+                    if (custEl && prev.customer) custEl.value = prev.customer;
+                    if (eqEl && prev.gateOutEquipment) eqEl.value = prev.gateOutEquipment;
+                    if (eirEl && prev.eirRef) eirEl.value = prev.eirRef;
+                    if (vanOutEl && prev.vanOutAmount) vanOutEl.value = prev.vanOutAmount;
+                    if (rateEl && prev.storageRate) rateEl.value = String(prev.storageRate);
+                    if (etaPullEl && prev.etaPulloutDate) etaPullEl.value = prev.etaPulloutDate;
+                    if (todEl && prev.gateOutToD) todEl.value = prev.gateOutToD;
+                    if (remEl && prev.remarks) remEl.value = prev.remarks;
+
+                    showSkymoverNotice(
+                        `Container ${match.number} was rejected earlier${match.rejectedGateOut.reason ? `: "${match.rejectedGateOut.reason}"` : ''}. Previous Gate-Out fields loaded for editing.`,
+                        'warning'
+                    );
+                }
 
 				const gateOutDateInput = document.getElementById('calcGateOutDate');
                 if (gateOutDateInput && match.date) gateOutDateInput.value = formatIsoToLocalDateTimeInput(new Date());
@@ -11093,8 +11083,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const remarks = details.remarks || '';
             const releasePhotos = Array.isArray(details.releasePhotos) ? details.releasePhotos : [];
 
-            match.status = 'Released';
+			match.status = 'Released';
             delete match.pendingGateOut;
+            delete match.rejectedGateOut;
             match.gateOutDate = gateOutDate;
             match.etaPulloutDate = etaPulloutDate;
             match.gateOutToD = gateOutToD;
@@ -11196,13 +11187,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
             );
             if (!ok) return;
 
-		delete target.pendingGateOut;
+			const previousGateOut = target.pendingGateOut || {};
+            const rejectReason = prompt(
+                `Optional note for Dispatcher on why Gate-Out for Container ${target.number} is rejected (for re-editing):`,
+                ''
+            );
+            delete target.pendingGateOut;
             target.status = 'Available';
+            target.rejectedGateOut = {
+                containerNumber: target.number,
+                rejectedBy: currentUserEmail || currentUserRole,
+                rejectedAt: new Date().toISOString(),
+                reason: (rejectReason || '').trim(),
+                previousDetails: previousGateOut
+            };
             await syncYardContainerToSupabase(target);
             await saveCloudData();
             refreshYard();
             populateYardOutContainerDropdown();
-            showSkymoverNotice(`Gate-Out confirmation for ${target.number} rejected; status returned to Available.`, 'warning');
+            showSkymoverNotice(`Gate-Out for ${target.number} rejected and returned to Dispatcher for re-editing.`, 'warning');
         }
 
         function openMergedContainerDetailsModal(index) {
