@@ -6693,10 +6693,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
 		                    status === 408 ||
 		                    /timeout|timed out|gateway timeout/i.test(detailedMsg);
 
-		                if (isTimeout) {
+						if (isTimeout) {
 		                    alert(
 		                        `Database Auth Notice: ${detailedMsg} (Request timed out on Auth/SMTP/hook). ` +
-		                        `Check if "${email}" was already created in Supabase Auth Users before retrying.`
+		                        `Check Supabase Auth Users & Edge Function logs for "${email}" before retrying so you don't hit a duplicate-email error.`
 		                    );
 		                } else {
 		                    alert("Database Auth Notice: " + detailedMsg);
