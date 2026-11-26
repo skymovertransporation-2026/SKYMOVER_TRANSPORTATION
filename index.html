@@ -3625,13 +3625,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
 		function formatIsoToLocalDateTimeInput(isoStr) {
-            if (!isoStr) return '';
-            // If already a local datetime-local string without timezone (e.g. "2026-11-21T10:58")
-            if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(isoStr).trim())) {
-                return String(isoStr).trim();
+            if (isoStr === null || isoStr === undefined || isoStr === '') return '';
+            if (typeof isoStr === 'string') {
+                const trimmed = isoStr.trim();
+                if (!trimmed) return '';
+                // Already a datetime-local value (e.g. "2026-11-21T10:58" or with seconds)
+                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(trimmed)) {
+                    return trimmed.slice(0, 16);
+                }
             }
-            const d = new Date(isoStr);
-            if (isNaN(d.getTime())) return String(isoStr).slice(0, 16);
+            const d = isoStr instanceof Date ? isoStr : new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
             const pad = n => String(n).padStart(2, '0');
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
@@ -3661,14 +3665,23 @@ Skymover Transport is not liable for charges incurred due to operational constra
             db.transshipments = deduplicateArrayByKey(db.transshipments, t => `id:${(t.id || '').trim().toUpperCase()}`);
 
             // Deduplicate active containers by ID or Container Number (prevents timezone-shifted duplicates)
-            yardDb.containers = deduplicateArrayByKey(yardDb.containers, c => {
+			yardDb.containers = deduplicateArrayByKey(yardDb.containers, c => {
                 const num = (c.number || '').trim().toUpperCase();
                 if (c.status !== 'Released') return `active_cnt:${num}`;
-                return c.id ? `id:${c.id}` : `rel_cnt:${num}_${(c.gateOutDate || c.date || '').trim()}`;
+                const relDate = formatIsoToLocalDateTimeInput(c.gateOutDate || c.date);
+                return c.id ? `id:${c.id}` : `rel_cnt:${num}_${relDate}`;
             });
-            yardDb.movements = deduplicateArrayByKey(yardDb.movements, m => m.id ? `id:${m.id}` : `mov:${(m.kind || '').toUpperCase()}_${(m.container || '').trim().toUpperCase()}_${(m.date || '').trim()}`);
-            yardDb.revenues = deduplicateArrayByKey(yardDb.revenues, r => r.id ? `id:${r.id}` : `rev:${(r.source || '').trim()}_${(r.container || '').trim().toUpperCase()}_${(r.date || '').trim()}_${Number(r.amount || 0)}`);
-            yardDb.expenses = deduplicateArrayByKey(yardDb.expenses, ex => ex.id ? `id:${ex.id}` : `exp:${(ex.category || '').trim()}_${(ex.description || '').trim()}_${(ex.date || '').trim()}_${Number(ex.amount || 0)}`);
+			yardDb.movements = deduplicateArrayByKey(yardDb.movements, m => m.id ? `id:${m.id}` : `mov:${(m.kind || '').toUpperCase()}_${(m.container || '').trim().toUpperCase()}_${formatIsoToLocalDateTimeInput(m.date)}`);
+            yardDb.revenues = deduplicateArrayByKey(yardDb.revenues, r => r.id ? `id:${r.id}` : `rev:${(r.source || '').trim()}_${(r.container || '').trim().toUpperCase()}_${formatIsoToLocalDateTimeInput(r.date)}_${Number(r.amount || 0)}`);
+            yardDb.expenses = deduplicateArrayByKey(yardDb.expenses, ex => {
+                if (ex.id !== undefined && ex.id !== null) return `id:${ex.id}`;
+                const rawDate = String(ex.date || '').trim();
+                const parsedMs = rawDate ? new Date(rawDate).getTime() : NaN;
+                const dayKey = !isNaN(parsedMs)
+                    ? formatIsoToLocalDateTimeInput(new Date(parsedMs).toISOString()).slice(0, 10)
+                    : rawDate.slice(0, 10);
+                return `exp:${(ex.category || '').trim().toLowerCase()}_${(ex.description || '').trim().toLowerCase()}_${dayKey}_${Number(ex.amount || 0)}`;
+            });
         }
 
 		async function fetchCloudData() {
@@ -5950,10 +5963,16 @@ Skymover Transport is not liable for charges incurred due to operational constra
             }
             clearGateInPhotos();
         }
-        function clearGateOutFormAndPhotos() {
+		function clearGateOutFormAndPhotos() {
             const form = document.getElementById('yardGateOutForm');
             if (form) form.reset();
             clearGateOutPhotos();
+            const daysEl = document.getElementById('calcStorageDays');
+            const totalEl = document.getElementById('calcTotalAmount');
+            const noticeEl = document.getElementById('vanInDeductionNotice');
+            if (daysEl) daysEl.value = '0';
+            if (totalEl) totalEl.value = '0.00';
+            if (noticeEl) noticeEl.classList.add('hidden');
             if (!isClientQrMode) containerSelectedForGateOut();
         }
         function clearYardExpenseForm() {
@@ -8457,7 +8476,6 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             : formatIsoToLocalDateTimeInput(new Date().toISOString())
                     }));
 
-                    const cloudIds = new Set(cloudYardExp.map(ex => String(ex.id)));
                     // Keep only local rows that have no `id` yet (offline/unassigned); drop any `id`'d row absent from `yard_expenses`
                     const unsyncedLocal = (yardDb.expenses || []).filter(
                         localEx => localEx && (localEx.id === undefined || localEx.id === null)
@@ -10097,8 +10115,19 @@ Skymover Transport is not liable for charges incurred due to operational constra
 			if (tabId !== 'yardGateIn') {
 		        resetGateInEditState();
 		    }
-            const target = document.getElementById(tabId);
+			const target = document.getElementById(tabId);
             if(target) target.classList.remove('hidden');
+
+            const nowLocalStr = formatIsoToLocalDateTimeInput(new Date());
+            if (tabId === 'yardGateIn' && nowLocalStr) {
+                const giDateEl = document.getElementById('gateInDateInput');
+                const giEtaEl = document.getElementById('gateInETADateInput');
+                if (giDateEl && !giDateEl.value) giDateEl.value = nowLocalStr;
+                if (giEtaEl && !giEtaEl.value) giEtaEl.value = nowLocalStr;
+            } else if (tabId === 'yardExpenses' && nowLocalStr) {
+                const expDateEl = document.getElementById('expenseDateInput');
+                if (expDateEl && !expDateEl.value) expDateEl.value = nowLocalStr;
+            }
 
             ['yBtn1', 'yBtn2', 'yBtn3', 'yBtn4', 'yBtn5', 'yBtn6', 'yBtn7', 'yBtn8', 'yBtnSettings'].forEach(id => {
                 const b = document.getElementById(id);
@@ -10890,8 +10919,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 if(vanInAmountInput) vanInAmountInput.value = match.vanInAmount || 0;
                 if(gateInDisplay) gateInDisplay.value = match.date || '';
 
-                const gateOutDateInput = document.getElementById('calcGateOutDate');
-                if (gateOutDateInput && match.date) gateOutDateInput.value = new Date().toISOString().slice(0,16);
+				const gateOutDateInput = document.getElementById('calcGateOutDate');
+                if (gateOutDateInput && match.date) gateOutDateInput.value = formatIsoToLocalDateTimeInput(new Date());
                 recalculateTotals();
             } else {
                 if(plateInput) plateInput.value = '';
@@ -11470,12 +11499,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
             populateMonthlyStatementSelect();
         }
 
-        function clearDateFilter() {
+		function clearDateFilter() {
 			const fromEl = document.getElementById('filterDateFrom');
 		    const toEl = document.getElementById('filterDateTo');
 			const eqFilterEl = document.getElementById('filterRevenueEquipment');
 		    if (fromEl) fromEl.value = '';
 		    if (toEl) toEl.value = '';
+		    if (eqFilterEl) eqFilterEl.value = '';
             renderYardRevenue();
         }
 
