@@ -551,7 +551,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">PENDING / PENDING GATE-OUT</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardPendingCombined">0</div><div class="text-[11px] text-slate-500 font-mono">Pending: <span id="yardPendingCount">0</span> • Pending Gate-Out: <span id="yardPendingGateOutCount">0</span></div></div>
+                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">PENDING / PENDING GATE-OUT</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardPendingCombined">0</div><div class="text-[11px] text-slate-500 font-mono">Pending (Client QR): <span id="yardPendingCount">0</span> • Pending Gate-Out: <span id="yardPendingGateOutCount">0</span></div></div>
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">RELEASED (GATED OUT)</div><div class="text-2xl font-extrabold text-slate-700 my-1" id="yardReleasedCount">0</div><div class="text-[11px] text-slate-500">Completed &amp; locked historical units</div></div>
                 </div>
 
@@ -10217,7 +10217,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const availableCount = activeContainers.filter(c => c.status === 'Available').length;
             const reservedCount = activeContainers.filter(c => c.status === 'Reserved').length;
             const damagedCount = activeContainers.filter(c => c.status === 'Hold' || c.condition === 'Damaged').length;
-            const pendingCount = activeContainers.filter(c => c.status === 'Pending').length;
+            const pendingQrCount = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications.length : 0;
+            const pendingContainerCount = activeContainers.filter(c => c.status === 'Pending').length;
+            const pendingCount = Math.max(pendingQrCount, pendingContainerCount);
             const pendingGateOutCount = activeContainers.filter(c => c.status === 'Pending Gate-Out').length;
             const releasedCount = containers.filter(c => c.status === 'Released').length;
 
@@ -10413,8 +10415,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     return st !== 'ACCEPTED' && st !== 'REJECTED';
                 });
 
-                if (badge) badge.textContent = String(pendingClientGateNotifications.length);
+				if (badge) badge.textContent = String(pendingClientGateNotifications.length);
                 renderClientGateNotificationsTable();
+                if (typeof refreshYardDashboard === 'function') refreshYardDashboard();
             } catch (err) {
                 console.warn('fetchClientGateNotifications exception:', err.message || err);
             }
