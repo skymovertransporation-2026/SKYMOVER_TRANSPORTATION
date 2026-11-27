@@ -550,9 +550,10 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statDam">DAMAGED / HOLD</div><div class="text-3xl font-extrabold text-rose-700 my-1" id="yardDamaged">0</div></div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">PENDING / PENDING GATE-OUT</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardPendingCombined">0</div><div class="text-[11px] text-slate-500 font-mono">Pending (Client QR): <span id="yardPendingCount">0</span> • Pending Gate-Out: <span id="yardPendingGateOutCount">0</span></div></div>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">PENDING / PENDING GATE-OUT</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardPendingCombined">0</div><div class="text-[11px] text-slate-500 font-mono">Pending: <span id="yardPendingCount">0</span> • Pending Gate-Out: <span id="yardPendingGateOutCount">0</span></div></div>
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">RELEASED (GATED OUT)</div><div class="text-2xl font-extrabold text-slate-700 my-1" id="yardReleasedCount">0</div><div class="text-[11px] text-slate-500">Completed &amp; locked historical units</div></div>
+                    <div id="yardDashboardClientQrCard" class="card bg-white text-slate-900 p-5 rounded-2xl shadow border cursor-pointer hover:border-sky-400 transition" onclick="openYardClientQrFiltered('ALL')"><div class="text-xs font-semibold text-slate-700">PENDING CLIENT QR SUBMISSIONS</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardDashboardClientQrPendingCount">0</div><div class="text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-1.5"><span id="yardDashboardClientQrGateInFilterBtn" class="px-1.5 py-0.5 rounded hover:text-sky-700 hover:underline font-bold transition" onclick="event.stopPropagation(); openYardClientQrFiltered('GATE_IN');">Gate-In: <span id="yardDashboardClientQrGateInCount">0</span></span><span>•</span><span id="yardDashboardClientQrGateOutFilterBtn" class="px-1.5 py-0.5 rounded hover:text-purple-700 hover:underline font-bold transition" onclick="event.stopPropagation(); openYardClientQrFiltered('GATE_OUT');">Gate-Out: <span id="yardDashboardClientQrGateOutCount">0</span></span></div></div>
                 </div>
 
 				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -595,11 +596,13 @@ Skymover Transport is not liable for charges incurred due to operational constra
             <div id="yardInventory" class="yard-tab hidden space-y-6">
                 <div id="yardClientRequestsPanel" class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-sky-200 space-y-4">
                     <div class="flex flex-wrap justify-between items-center gap-3">
-                        <div>
-                            <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+						<div>
+                            <h3 class="font-bold text-base text-slate-900 flex flex-wrap items-center gap-2">
                                 <i class="fa-solid fa-qrcode text-sky-600"></i>
                                 Pending Client QR Submissions
                                 <span id="clientQrPendingCountBadge" class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-900 text-[11px] font-extrabold">0</span>
+                                <span id="clientQrMovementFilterBadge" class="hidden px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-extrabold"></span>
+                                <button type="button" id="clientQrShowAllBtn" onclick="openYardClientQrFiltered('ALL')" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-800 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition">Show All</button>
                             </h3>
                             <p class="text-xs text-slate-600">Review Gate-In and Gate-Out requests submitted via the Client QR portal before adding them to active yard stock.</p>
                         </div>
@@ -4418,8 +4421,9 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 } catch (e) {}
             }
 
-            yardDb = { containers: [], movements: [], revenues: [], expenses: [] };
+			yardDb = { containers: [], movements: [], revenues: [], expenses: [] };
             pendingClientGateNotifications = [];
+            clientQrMovementFilter = 'ALL';
             stagedGateInPhotos = [];
             stagedGateOutPhotos = [];
             stagedDriverProofPhotos = [];
@@ -4443,8 +4447,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             populateYardOutContainerDropdown();
             renderClientGateNotificationsTable();
-            const pendingBadge = document.getElementById('clientQrPendingCountBadge');
+			const pendingBadge = document.getElementById('clientQrPendingCountBadge');
             if (pendingBadge) pendingBadge.textContent = '0';
+			const dashQrBadge = document.getElementById('yardDashboardClientQrPendingCount');
+            if (dashQrBadge) dashQrBadge.textContent = '0';
+            const dashQrGateInBadge = document.getElementById('yardDashboardClientQrGateInCount');
+            if (dashQrGateInBadge) dashQrGateInBadge.textContent = '0';
+            const dashQrGateOutBadge = document.getElementById('yardDashboardClientQrGateOutCount');
+            if (dashQrGateOutBadge) dashQrGateOutBadge.textContent = '0';
             refreshYardDashboard();
             refreshYard();
             renderYardRevenue();
@@ -6239,7 +6249,14 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 viewName = getRoleDefaultView(currentUserRole);
             }
 
-            localStorage.setItem('skymover_active_view', viewName);
+			localStorage.setItem('skymover_active_view', viewName);
+
+            const viewYardEl = document.getElementById('viewYard');
+            if (viewName !== 'yard' && viewYardEl && !viewYardEl.classList.contains('hidden')) {
+                if (typeof resetGateInEditState === 'function') resetGateInEditState();
+                if (typeof clearGateInFormAndPhotos === 'function') clearGateInFormAndPhotos();
+                if (typeof clearGateOutFormAndPhotos === 'function') clearGateOutFormAndPhotos();
+            }
 
             ['viewLanding', 'viewBackend', 'viewDriver', 'viewHub', 'viewYard'].forEach(v => {
                 const el = document.getElementById(v);
@@ -10151,7 +10168,52 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 localStorage.setItem('skymover_active_yard_tab', tabId);
             }
 
-            document.querySelectorAll('.yard-tab').forEach(el => el.classList.add('hidden'));
+			document.querySelectorAll('.yard-tab').forEach(el => el.classList.add('hidden'));
+            if (tabId !== 'yardInventory') {
+                if (typeof clientQrMovementFilter !== 'undefined' && clientQrMovementFilter !== 'ALL') {
+                    clientQrMovementFilter = 'ALL';
+                    if (typeof renderClientGateNotificationsTable === 'function') {
+                        renderClientGateNotificationsTable();
+                    }
+                }
+                const searchEl = document.getElementById('yardSearchInput');
+                const statusEl = document.getElementById('yardInventoryStatusFilter');
+                const equipEl = document.getElementById('yardInventoryEquipmentFilter');
+                const hasMasterInvFilter = Boolean(
+                    (searchEl && searchEl.value.trim()) ||
+                    (statusEl && statusEl.value) ||
+                    (equipEl && equipEl.value)
+                );
+			if (hasMasterInvFilter && typeof resetYardInventoryFilters === 'function') {
+                    resetYardInventoryFilters();
+                }
+            }
+            if (tabId !== 'yardReports') {
+                const reportsEquipEl = document.getElementById('yardReportsEquipmentFilter');
+                const hasReportsEquipFilter = Boolean(
+                    (reportsEquipEl && reportsEquipEl.value) ||
+                    (typeof currentExtractionEquipmentFilter === 'string' && currentExtractionEquipmentFilter.trim())
+                );
+			if (hasReportsEquipFilter && typeof syncEquipmentFilterValue === 'function') {
+                    syncEquipmentFilterValue('', 'both');
+                    if (typeof renderYardReports === 'function') {
+                        renderYardReports();
+                    }
+                }
+            }
+            if (tabId !== 'yardRevenue') {
+                const fromEl = document.getElementById('filterDateFrom');
+                const toEl = document.getElementById('filterDateTo');
+                const revEquipEl = document.getElementById('filterRevenueEquipment');
+                const hasRevenueFilter = Boolean(
+                    (fromEl && fromEl.value) ||
+                    (toEl && toEl.value) ||
+                    (revEquipEl && revEquipEl.value)
+                );
+                if (hasRevenueFilter && typeof clearDateFilter === 'function') {
+                    clearDateFilter();
+                }
+            }
 			if (tabId !== 'yardGateIn') {
 		        resetGateInEditState();
 		    }
@@ -10217,9 +10279,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const availableCount = activeContainers.filter(c => c.status === 'Available').length;
             const reservedCount = activeContainers.filter(c => c.status === 'Reserved').length;
             const damagedCount = activeContainers.filter(c => c.status === 'Hold' || c.condition === 'Damaged').length;
-            const pendingQrCount = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications.length : 0;
-            const pendingContainerCount = activeContainers.filter(c => c.status === 'Pending').length;
-            const pendingCount = Math.max(pendingQrCount, pendingContainerCount);
+            const pendingCount = activeContainers.filter(c => c.status === 'Pending').length;
             const pendingGateOutCount = activeContainers.filter(c => c.status === 'Pending Gate-Out').length;
             const releasedCount = containers.filter(c => c.status === 'Released').length;
 
@@ -10229,8 +10289,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
             if (document.getElementById('yardDamaged')) document.getElementById('yardDamaged').innerText = damagedCount;
             if (document.getElementById('yardPendingCount')) document.getElementById('yardPendingCount').innerText = pendingCount;
             if (document.getElementById('yardPendingGateOutCount')) document.getElementById('yardPendingGateOutCount').innerText = pendingGateOutCount;
-            if (document.getElementById('yardPendingCombined')) document.getElementById('yardPendingCombined').innerText = pendingCount + pendingGateOutCount;
+			if (document.getElementById('yardPendingCombined')) document.getElementById('yardPendingCombined').innerText = pendingCount + pendingGateOutCount;
             if (document.getElementById('yardReleasedCount')) document.getElementById('yardReleasedCount').innerText = releasedCount;
+			const qrPendingItems = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications : [];
+            const qrPendingTotal = qrPendingItems.length;
+            const qrGateInCount = qrPendingItems.filter(r => String(r?.movement_type || 'GATE_IN').toUpperCase().includes('IN')).length;
+            const qrGateOutCount = qrPendingItems.filter(r => String(r?.movement_type || '').toUpperCase().includes('OUT')).length;
+            if (document.getElementById('yardDashboardClientQrPendingCount')) document.getElementById('yardDashboardClientQrPendingCount').innerText = qrPendingTotal;
+            if (document.getElementById('yardDashboardClientQrGateInCount')) document.getElementById('yardDashboardClientQrGateInCount').innerText = qrGateInCount;
+            if (document.getElementById('yardDashboardClientQrGateOutCount')) document.getElementById('yardDashboardClientQrGateOutCount').innerText = qrGateOutCount;
 
             const gateInMoves = (yardDb.movements || []).filter(m => m.kind === 'GATE-IN');
             const uniqueGateInContainers = new Set(
@@ -10385,6 +10452,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
         }
 
 		let pendingClientGateNotifications = [];
+        let clientQrMovementFilter = 'ALL';
+
+        function openYardClientQrFiltered(mode = 'ALL') {
+            clientQrMovementFilter = (mode === 'GATE_IN' || mode === 'GATE_OUT') ? mode : 'ALL';
+            switchYardTab('yardInventory');
+            renderClientGateNotificationsTable();
+            const panel = document.getElementById('yardClientRequestsPanel');
+            if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
         async function fetchClientGateNotifications() {
             const tbody = document.getElementById('clientGateNotificationsBody');
@@ -10415,9 +10491,8 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     return st !== 'ACCEPTED' && st !== 'REJECTED';
                 });
 
-				if (badge) badge.textContent = String(pendingClientGateNotifications.length);
+                if (badge) badge.textContent = String(pendingClientGateNotifications.length);
                 renderClientGateNotificationsTable();
-                if (typeof refreshYardDashboard === 'function') refreshYardDashboard();
             } catch (err) {
                 console.warn('fetchClientGateNotifications exception:', err.message || err);
             }
@@ -10427,17 +10502,79 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const tbody = document.getElementById('clientGateNotificationsBody');
             if (!tbody) return;
 
-            const pendingList = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications : [];
+			const pendingList = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications : [];
             const badge = document.getElementById('clientQrPendingCountBadge');
             if (badge) badge.textContent = String(pendingList.length);
+            const dashQrBadge = document.getElementById('yardDashboardClientQrPendingCount');
+            if (dashQrBadge) dashQrBadge.textContent = String(pendingList.length);
+            const dashQrGateInBadge = document.getElementById('yardDashboardClientQrGateInCount');
+            const dashQrGateOutBadge = document.getElementById('yardDashboardClientQrGateOutCount');
+            if (dashQrGateInBadge) {
+                dashQrGateInBadge.textContent = String(pendingList.filter(r => String(r?.movement_type || 'GATE_IN').toUpperCase().includes('IN')).length);
+            }
+            if (dashQrGateOutBadge) {
+                dashQrGateOutBadge.textContent = String(pendingList.filter(r => String(r?.movement_type || '').toUpperCase().includes('OUT')).length);
+            }
 
+			const filteredList = pendingList.filter(req => {
+                const mType = String(req?.movement_type || 'GATE_IN').toUpperCase();
+                if (clientQrMovementFilter === 'GATE_IN') return mType.includes('IN');
+                if (clientQrMovementFilter === 'GATE_OUT') return mType.includes('OUT');
+                return true;
+            });
+
+			const filterBadgeEl = document.getElementById('clientQrMovementFilterBadge');
+            const showAllBtnEl = document.getElementById('clientQrShowAllBtn');
+            if (filterBadgeEl && showAllBtnEl) {
+                if (clientQrMovementFilter === 'GATE_IN' || clientQrMovementFilter === 'GATE_OUT') {
+                    const label = clientQrMovementFilter === 'GATE_IN' ? 'Gate-In Only' : 'Gate-Out Only';
+                    filterBadgeEl.textContent = `${label} (${filteredList.length})`;
+                    filterBadgeEl.classList.remove('hidden');
+                    showAllBtnEl.classList.remove('hidden');
+                } else {
+                    filterBadgeEl.textContent = '';
+                    filterBadgeEl.classList.add('hidden');
+                    showAllBtnEl.classList.add('hidden');
+                }
+            }
+
+            const gateInBtnEl = document.getElementById('yardDashboardClientQrGateInFilterBtn');
+            const gateOutBtnEl = document.getElementById('yardDashboardClientQrGateOutFilterBtn');
+            if (gateInBtnEl) {
+                gateInBtnEl.className = clientQrMovementFilter === 'GATE_IN'
+                    ? 'px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 ring-1 ring-sky-400 underline font-extrabold transition'
+                    : 'px-1.5 py-0.5 rounded hover:text-sky-700 hover:underline font-bold transition';
+            }
+			if (gateOutBtnEl) {
+                gateOutBtnEl.className = clientQrMovementFilter === 'GATE_OUT'
+                    ? 'px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 ring-1 ring-purple-400 underline font-extrabold transition'
+                    : 'px-1.5 py-0.5 rounded hover:text-purple-700 hover:underline font-bold transition';
+            }
+
+            const qrCardEl = document.getElementById('yardDashboardClientQrCard');
+            if (qrCardEl) {
+                if (clientQrMovementFilter === 'GATE_IN') {
+                    qrCardEl.className = 'card bg-white text-slate-900 p-5 rounded-2xl shadow border-2 border-sky-500 ring-2 ring-sky-200 cursor-pointer transition';
+                } else if (clientQrMovementFilter === 'GATE_OUT') {
+                    qrCardEl.className = 'card bg-white text-slate-900 p-5 rounded-2xl shadow border-2 border-purple-500 ring-2 ring-purple-200 cursor-pointer transition';
+                } else {
+                    qrCardEl.className = 'card bg-white text-slate-900 p-5 rounded-2xl shadow border cursor-pointer hover:border-sky-400 transition';
+                }
+            }
+			
 			const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
-            if (!pendingList.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>';
+            if (!filteredList.length) {
+                const emptyMsg = clientQrMovementFilter === 'ALL'
+                    ? 'No pending Client QR requests.'
+                    : `No pending ${clientQrMovementFilter === 'GATE_IN' ? 'Gate-In' : 'Gate-Out'} Client QR requests.`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">${escapeHtml(emptyMsg)}</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = pendingList.map((req, idx) => {
+            const pendingIndexMap = new Map(pendingList.map((item, i) => [item, i]));
+
+            tbody.innerHTML = filteredList.map((req) => {
+                const idx = pendingIndexMap.get(req);
                 const mType = req.movement_type || 'GATE_IN';
                 const isGateIn = String(mType).toUpperCase().includes('IN');
                 const detailLine = isGateIn
