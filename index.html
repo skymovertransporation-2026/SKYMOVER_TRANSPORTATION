@@ -544,28 +544,33 @@ Skymover Transport is not liable for charges incurred due to operational constra
             <!-- Yard Tab 1: Dashboard -->
             <div id="yardDashboard" class="yard-tab space-y-6">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statTotal">TOTAL CONTAINERS ON-HAND</div><div class="text-3xl font-extrabold text-slate-900 my-1" id="yardTotal">0</div></div>
+					<div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statTotal">TOTAL CONTAINERS ON-HAND</div><div class="text-3xl font-extrabold text-slate-900 my-1" id="yardTotal">0</div></div>
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statAvail">AVAILABLE & GOOD</div><div class="text-3xl font-extrabold text-emerald-700 my-1" id="yardAvailable">0</div></div>
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statRes">RESERVED</div><div class="text-3xl font-extrabold text-amber-700 my-1" id="yardReserved">0</div></div>
                     <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700" data-i18n="statDam">DAMAGED / HOLD</div><div class="text-3xl font-extrabold text-rose-700 my-1" id="yardDamaged">0</div></div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">PENDING / PENDING GATE-OUT</div><div class="text-2xl font-extrabold text-sky-700 my-1" id="yardPendingCombined">0</div><div class="text-[11px] text-slate-500 font-mono">Pending: <span id="yardPendingCount">0</span> • Pending Gate-Out: <span id="yardPendingGateOutCount">0</span></div></div>
+                    <div class="card bg-white text-slate-900 p-5 rounded-2xl shadow border"><div class="text-xs font-semibold text-slate-700">RELEASED (GATED OUT)</div><div class="text-2xl font-extrabold text-slate-700 my-1" id="yardReleasedCount">0</div><div class="text-[11px] text-slate-500">Completed &amp; locked historical units</div></div>
+                </div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200 flex flex-col justify-between">
                         <div>
                             <h3 class="font-bold text-base text-slate-900 mb-1"><i class="fa-solid fa-chart-pie text-amber-600 mr-2"></i> Stock Status Distribution</h3>
-                            <p class="text-xs text-slate-600">Visual ratio of available, reserved, and damaged/hold container units.</p>
+                            <p class="text-xs text-slate-600">Visual ratio across Available, Reserved, Damaged / Hold, Pending, Pending Gate-Out, and Released units.</p>
                         </div>
                         <div class="w-full h-64 relative my-auto py-2">
                             <canvas id="yardStatusPieChart"></canvas>
                         </div>
-                        <div class="text-[11px] text-slate-500 text-center font-medium">Updates dynamically in real time</div>
+                        <div class="text-[11px] text-slate-500 text-center font-medium">Updates dynamically in real time across all master inventory statuses</div>
                     </div>
 
                     <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200 flex flex-col justify-between">
                         <div>
                             <h3 class="font-bold text-base text-slate-900 mb-1"><i class="fa-solid fa-chart-column text-sky-600 mr-2"></i> Yard Stock Count by Status</h3>
-                            <p class="text-xs text-slate-600">Comparative bar graph representation of active yard inventory categories.</p>
+                            <p class="text-xs text-slate-600">Comparative bar graph of Available, Reserved, Damaged / Hold, Pending, Pending Gate-Out, and Released counts.</p>
                         </div>
                         <div class="w-full h-64 relative my-auto py-2">
                             <canvas id="yardStatusBarGraph"></canvas>
@@ -623,12 +628,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
                 <div class="panel bg-white text-slate-900 p-6 rounded-2xl shadow border border-slate-200">
                     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-                        <div>
-                            <h3 class="font-bold text-base text-slate-900">Empty Container Master Inventory</h3>
+						<div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="font-bold text-base text-slate-900">Empty Container Master Inventory</h3>
+                                <span id="yardInventoryFilteredCountBadge" class="hidden inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-extrabold"></span>
+                            </div>
                             <p class="text-xs text-slate-600">Real-time status, condition, and location tracking.</p>
                         </div>
-                        <div class="flex flex-wrap gap-2">
-                            <input type="text" id="yardSearchInput" oninput="renderYardInventory()" placeholder="Search container no, line, plate..." class="p-2 border rounded-lg text-xs w-64 bg-slate-50 text-slate-900 font-medium">
+						<div class="flex flex-wrap gap-2">
+                            <input type="text" id="yardSearchInput" oninput="renderYardInventory()" placeholder="Search container, line, plate, trucking, driver, EIR..." class="p-2 border rounded-lg text-xs w-72 bg-slate-50 text-slate-900 font-medium">
+                            <select id="yardInventoryStatusFilter" onchange="renderYardInventory()" class="p-2 border rounded-lg text-xs bg-slate-50 text-slate-900 font-semibold">
+                                <option value="">All Statuses</option>
+                                <option value="Available">Available</option>
+                                <option value="Reserved">Reserved</option>
+                                <option value="Hold">Hold</option>
+                                <option value="Damaged / Hold">Damaged / Hold</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Pending Gate-Out">Pending Gate-Out</option>
+                                <option value="Released">Released</option>
+                            </select>
                             <select id="yardInventoryEquipmentFilter" onchange="renderYardInventory()" class="p-2 border rounded-lg text-xs bg-slate-50 text-slate-900 font-semibold">
                                 <option value="">All Equipment</option>
                                 <option value="Crawler Crane">Crawler Crane</option>
@@ -640,6 +658,58 @@ Skymover Transport is not liable for charges incurred due to operational constra
                             <button onclick="exportYardCSV()" class="bg-slate-200 hover:bg-slate-300 px-3 py-2 rounded-lg text-xs font-semibold text-slate-800">Export Inventory CSV</button>
                         </div>
                     </div>
+
+					<div id="yardActiveStatusFilterBanner" class="hidden mb-4 flex flex-wrap items-center justify-between gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3.5 py-2 text-xs">
+                        <div class="flex items-center gap-2 text-slate-700 font-medium">
+                            <i class="fa-solid fa-filter text-sky-600"></i>
+                            <span>Filtered by Status:</span>
+                            <span id="yardActiveStatusFilterBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-sky-600 text-white font-bold text-[11px]"></span>
+                            <span id="yardActiveStatusMatchCount" class="text-[11px] text-slate-500 font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="clearYardInventoryStatusFilter()" class="inline-flex items-center gap-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-xmark"></i> Clear Status
+                            </button>
+                            <button type="button" data-clear-all-filters="true" onclick="resetYardInventoryFilters()" class="hidden inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-rotate-left"></i> Clear All Filters
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="yardActiveEquipmentFilterBanner" class="hidden mb-4 flex flex-wrap items-center justify-between gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3.5 py-2 text-xs">
+                        <div class="flex items-center gap-2 text-slate-700 font-medium">
+                            <i class="fa-solid fa-crane text-indigo-600"></i>
+                            <span>Filtered by Equipment:</span>
+                            <span id="yardActiveEquipmentFilterBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-indigo-600 text-white font-bold text-[11px]"></span>
+                            <span id="yardActiveEquipmentMatchCount" class="text-[11px] text-slate-500 font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="clearYardInventoryEquipmentFilter()" class="inline-flex items-center gap-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-xmark"></i> Clear Equipment
+                            </button>
+                            <button type="button" data-clear-all-filters="true" onclick="resetYardInventoryFilters()" class="hidden inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-rotate-left"></i> Clear All Filters
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="yardActiveSearchFilterBanner" class="hidden mb-4 flex flex-wrap items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2 text-xs">
+                        <div class="flex items-center gap-2 text-slate-700 font-medium">
+                            <i class="fa-solid fa-magnifying-glass text-amber-600"></i>
+                            <span>Filtered by Search:</span>
+                            <span id="yardActiveSearchFilterBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-600 text-white font-mono font-bold text-[11px]"></span>
+                            <span id="yardActiveSearchMatchCount" class="text-[11px] text-slate-500 font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="clearYardInventorySearchFilter()" class="inline-flex items-center gap-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-xmark"></i> Clear Search
+                            </button>
+                            <button type="button" data-clear-all-filters="true" onclick="resetYardInventoryFilters()" class="hidden inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                <i class="fa-solid fa-rotate-left"></i> Clear All Filters
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs text-slate-900 font-medium">
                             <thead class="bg-slate-100 text-slate-800">
@@ -3807,12 +3877,25 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 const channel = supabaseClient.channel('skymover-logitrack-live');
                 skymoverRealtimeChannel = channel;
 
-                // 0. Live Yard Portal Settings Listener
+				// 0. Live Yard Portal Settings Listener
                 channel.on('postgres_changes', { event: '*', schema: 'public', table: 'yard_settings' }, payload => {
                     if (payload && payload.new) {
                         localStorage.setItem(YARD_SETTINGS_CACHE_KEY, JSON.stringify(payload.new));
                         renderYardPortalSettingsToUI(payload.new);
                     }
+                });
+
+                // 0b. Live Pending Client QR Submissions Listener
+                let gateNotifDebounceTimer = null;
+                channel.on('postgres_changes', { event: '*', schema: 'public', table: 'gate_notifications' }, () => {
+                    if (isClientQrMode || isSavingCloudData) return;
+                    clearTimeout(gateNotifDebounceTimer);
+                    gateNotifDebounceTimer = setTimeout(() => {
+                        if (typeof fetchClientGateNotifications === 'function') {
+                            fetchClientGateNotifications();
+                        }
+                        pulseRealtimeSyncStatus('Live Client QR Request');
+                    }, 200);
                 });
 
                 // 1. Unified Enterprise DB Listener
@@ -10104,8 +10187,15 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const activeBtn = document.getElementById(activeBtnId);
             if(activeBtn) activeBtn.className = "btn px-3 py-1.5 rounded-lg font-semibold bg-amber-600 text-white";
 
-            if(tabId === 'yardDashboard') refreshYardDashboard();
-            else if(tabId === 'yardInventory') renderYardInventory();
+			if(tabId === 'yardDashboard') refreshYardDashboard();
+            else if(tabId === 'yardInventory') {
+                const statusFilterEl = document.getElementById('yardInventoryStatusFilter');
+                if (statusFilterEl && statusFilterEl.value) {
+                    renderYardInventory();
+                } else {
+                    renderYardInventory();
+                }
+            }
             else if(tabId === 'yardGateOut') populateYardOutContainerDropdown();
             else if(tabId === 'yardRevenue') renderYardRevenue();
             else if(tabId === 'yardExpenses') renderYardExpenses();
@@ -10123,15 +10213,22 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             const containers = yardDb.containers || [];
             const activeContainers = containers.filter(c => c.status !== 'Released');
-            const totalCount = activeContainers.length;
+			const totalCount = activeContainers.length;
             const availableCount = activeContainers.filter(c => c.status === 'Available').length;
             const reservedCount = activeContainers.filter(c => c.status === 'Reserved').length;
             const damagedCount = activeContainers.filter(c => c.status === 'Hold' || c.condition === 'Damaged').length;
+            const pendingCount = activeContainers.filter(c => c.status === 'Pending').length;
+            const pendingGateOutCount = activeContainers.filter(c => c.status === 'Pending Gate-Out').length;
+            const releasedCount = containers.filter(c => c.status === 'Released').length;
 
-            if (document.getElementById('yardTotal')) document.getElementById('yardTotal').innerText = totalCount;
+			if (document.getElementById('yardTotal')) document.getElementById('yardTotal').innerText = totalCount;
             if (document.getElementById('yardAvailable')) document.getElementById('yardAvailable').innerText = availableCount;
             if (document.getElementById('yardReserved')) document.getElementById('yardReserved').innerText = reservedCount;
             if (document.getElementById('yardDamaged')) document.getElementById('yardDamaged').innerText = damagedCount;
+            if (document.getElementById('yardPendingCount')) document.getElementById('yardPendingCount').innerText = pendingCount;
+            if (document.getElementById('yardPendingGateOutCount')) document.getElementById('yardPendingGateOutCount').innerText = pendingGateOutCount;
+            if (document.getElementById('yardPendingCombined')) document.getElementById('yardPendingCombined').innerText = pendingCount + pendingGateOutCount;
+            if (document.getElementById('yardReleasedCount')) document.getElementById('yardReleasedCount').innerText = releasedCount;
 
             const gateInMoves = (yardDb.movements || []).filter(m => m.kind === 'GATE-IN');
             const uniqueGateInContainers = new Set(
@@ -10176,27 +10273,111 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 `).join('') : '<tr><td colspan="6" class="p-4 text-center text-slate-500">No recent movements logged.</td></tr>';
             }
 
-            renderYardCharts(availableCount, reservedCount, damagedCount);
+			renderYardCharts({available: availableCount,reserved: reservedCount,damagedHold: damagedCount,pending: pendingCount,pendingGateOut: pendingGateOutCount,released: releasedCount});
         }
 
-        function renderYardCharts(avail, res, dam) {
+		function openYardInventoryFilteredByStatus(statusLabel) {
+            if (isClientQrMode) return;
+            const cleanStatus = String(statusLabel || '').trim();
+            switchYardTab('yardInventory');
+            const statusFilterEl = document.getElementById('yardInventoryStatusFilter');
+            if (statusFilterEl) {
+                statusFilterEl.value = cleanStatus;
+            }
+            renderYardInventory();
+        }
+
+		function renderYardCharts(counts = {}) {
+            const labels = [
+                'Available',
+                'Reserved',
+                'Damaged / Hold',
+                'Pending',
+                'Pending Gate-Out',
+                'Released'
+            ];
+            const values = [
+                Number(counts.available || 0),
+                Number(counts.reserved || 0),
+                Number(counts.damagedHold || 0),
+                Number(counts.pending || 0),
+                Number(counts.pendingGateOut || 0),
+                Number(counts.released || 0)
+            ];
+            const colors = [
+                '#10b981', // Available (emerald)
+                '#f59e0b', // Reserved (amber)
+                '#f43f5e', // Damaged / Hold (rose)
+                '#0284c7', // Pending (sky)
+                '#8b5cf6', // Pending Gate-Out (violet)
+                '#64748b'  // Released (slate)
+            ];
+
+			const handleStatusChartClick = (event, elements, chartRef) => {
+                if (!elements || !elements.length || !chartRef) return;
+                const idx = elements[0].index;
+                const clickedLabel = chartRef.data && chartRef.data.labels ? chartRef.data.labels[idx] : '';
+                if (clickedLabel) {
+                    openYardInventoryFilteredByStatus(clickedLabel);
+                }
+            };
+
             const pieCtx = document.getElementById('yardStatusPieChart');
             if (pieCtx) {
+                pieCtx.style.cursor = 'pointer';
                 if (yardPieChartInstance) yardPieChartInstance.destroy();
                 yardPieChartInstance = new Chart(pieCtx, {
                     type: 'doughnut',
-                    data: { labels: ['Available', 'Reserved', 'Damaged / Hold'], datasets: [{ data: [avail, res, dam], backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'], borderWidth: 2, borderColor: '#ffffff' }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onHover: (event, elements) => {
+                            if (event?.native?.target) {
+                                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                            }
+                        },
+                        onClick: (event, elements) => handleStatusChartClick(event, elements, yardPieChartInstance),
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+                    }
                 });
             }
 
             const barCtx = document.getElementById('yardStatusBarGraph');
             if (barCtx) {
+                barCtx.style.cursor = 'pointer';
                 if (yardBarChartInstance) yardBarChartInstance.destroy();
                 yardBarChartInstance = new Chart(barCtx, {
                     type: 'bar',
-                    data: { labels: ['Available', 'Reserved', 'Damaged / Hold'], datasets: [{ label: 'Container Units', data: [avail, res, dam], backgroundColor: ['#0284c7', '#8b5cf6', '#ec4899'], borderRadius: 8 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Container Units',
+                            data: values,
+                            backgroundColor: colors,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onHover: (event, elements) => {
+                            if (event?.native?.target) {
+                                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                            }
+                        },
+                        onClick: (event, elements) => handleStatusChartClick(event, elements, yardBarChartInstance),
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
                 });
             }
         }
@@ -10227,7 +10408,7 @@ Skymover Transport is not liable for charges incurred due to operational constra
                     return;
                 }
 
-                pendingClientGateNotifications = (data || []).filter(row => {
+				pendingClientGateNotifications = (data || []).filter(row => {
                     const st = String(row.review_status || row.status || '').toUpperCase();
                     return st !== 'ACCEPTED' && st !== 'REJECTED';
                 });
@@ -10243,13 +10424,17 @@ Skymover Transport is not liable for charges incurred due to operational constra
             const tbody = document.getElementById('clientGateNotificationsBody');
             if (!tbody) return;
 
-            const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
-            if (!pendingClientGateNotifications.length) {
+            const pendingList = Array.isArray(pendingClientGateNotifications) ? pendingClientGateNotifications : [];
+            const badge = document.getElementById('clientQrPendingCountBadge');
+            if (badge) badge.textContent = String(pendingList.length);
+
+			const canReview = ['admin', 'yard_manager'].includes(currentUserRole);
+            if (!pendingList.length) {
                 tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending Client QR requests.</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = pendingClientGateNotifications.map((req, idx) => {
+            tbody.innerHTML = pendingList.map((req, idx) => {
                 const mType = req.movement_type || 'GATE_IN';
                 const isGateIn = String(mType).toUpperCase().includes('IN');
                 const detailLine = isGateIn
@@ -10470,27 +10655,173 @@ Skymover Transport is not liable for charges incurred due to operational constra
             showSkymoverNotice(`Rejected Client QR submission for ${req.container_number || 'container'}.`, 'warning');
         }
 		
+		function highlightInventorySearchTerm(text, query) {
+            const rawText = String(text ?? '');
+            const cleanQuery = String(query ?? '').trim();
+            if (!cleanQuery) return escapeHtml(rawText);
+
+            const escapedPattern = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedPattern})`, 'gi');
+            const parts = rawText.split(regex);
+
+            return parts.map(part => {
+                if (!part) return '';
+                if (part.toLowerCase() === cleanQuery.toLowerCase()) {
+                    return `<mark class="bg-amber-200 text-slate-950 font-extrabold px-0.5 rounded">${escapeHtml(part)}</mark>`;
+                }
+                return escapeHtml(part);
+            }).join('');
+        }
+
 		function renderYardInventory() {
             const tbody = document.getElementById('yardInventoryRows');
             if (!tbody) return;
 			const searchEl = document.getElementById('yardSearchInput');
             const search = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').toLowerCase();
+			const statusFilterEl = document.getElementById('yardInventoryStatusFilter');
+            const selectedStatus = (statusFilterEl && typeof statusFilterEl.value === 'string' ? statusFilterEl.value : '').trim();
             const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
             const selectedEq = (eqFilterEl && typeof eqFilterEl.value === 'string' ? eqFilterEl.value : '').trim().toLowerCase();
 			const isAdmin = currentUserRole === 'admin';
             const canYardEdit = ['admin', 'dispatcher', 'yard_manager'].includes(currentUserRole);
             const canAcceptPending = ['admin', 'yard_manager'].includes(currentUserRole);
 
-            const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
+			const allContainers = (yardDb.containers || []).map((c, idx) => ({ ...c, originalIdx: idx }));
             const containers = allContainers.filter(c => {
-                const containerEq = String(c.equipment || c.gateOutEquipment || '').trim().toLowerCase();
+                if (selectedStatus) {
+                    const rowStatus = String(c.status || '').trim();
+                    const isDamagedOrHold = rowStatus === 'Hold' || String(c.condition || '').trim() === 'Damaged';
+                    if (selectedStatus === 'Damaged / Hold') {
+                        if (!isDamagedOrHold) return false;
+                    } else if (rowStatus.toLowerCase() !== selectedStatus.toLowerCase()) {
+                        return false;
+                    }
+                }
+				const containerEq = String(c.equipment || c.gateOutEquipment || '').trim().toLowerCase();
                 if (selectedEq && containerEq !== selectedEq) return false;
                 if (!search) return true;
                 const num = String(c.number || '').toLowerCase();
                 const line = String(c.line || '').toLowerCase();
                 const plate = String(c.plate || '').toLowerCase();
-                return num.includes(search) || line.includes(search) || plate.includes(search) || containerEq.includes(search);
+				const trucking = String(c.truckingName || '').toLowerCase();
+                const driver = String(c.driver || '').toLowerCase();
+                const eir = String(c.eir || '').toLowerCase();
+                const rawGateIn = String(c.date || '').toLowerCase();
+                const formattedGateIn = c.date ? new Date(c.date).toLocaleString().toLowerCase() : '';
+				const rawGateOut = String(c.gateOutDate || '').toLowerCase();
+                const formattedGateOut = c.gateOutDate ? new Date(c.gateOutDate).toLocaleString().toLowerCase() : 'active';
+                const block = String(c.block || 'A').toLowerCase();
+                const bay = String(c.bay || '1').toLowerCase();
+				const row = String(c.row || 'GROUND').toLowerCase();
+                const formattedLocation = `block ${block}, bay ${bay} (${row})`;
+				const size = String(c.size || '').toLowerCase();
+                const type = String(c.type || 'Dry').toLowerCase();
+                const formattedSizeType = `${size} / ${type}`;
+				const statusText = String(c.status || '').toLowerCase();
+                const conditionText = String(c.condition || '').toLowerCase();
+                const remarksText = String(c.remarks || '').toLowerCase();
+                return (
+                    num.includes(search) ||
+                    line.includes(search) ||
+                    plate.includes(search) ||
+                    containerEq.includes(search) ||
+                    trucking.includes(search) ||
+                    driver.includes(search) ||
+                    eir.includes(search) ||
+                    rawGateIn.includes(search) ||
+                    formattedGateIn.includes(search) ||
+                    rawGateOut.includes(search) ||
+                    formattedGateOut.includes(search) ||
+                    block.includes(search) ||
+                    bay.includes(search) ||
+                    row.includes(search) ||
+                    formattedLocation.includes(search) ||
+                    size.includes(search) ||
+                    type.includes(search) ||
+                    formattedSizeType.includes(search) ||
+                    statusText.includes(search) ||
+                    conditionText.includes(search) ||
+                    remarksText.includes(search)
+                );
             });
+
+			const statusBannerEl = document.getElementById('yardActiveStatusFilterBanner');
+            const statusBadgeEl = document.getElementById('yardActiveStatusFilterBadge');
+            const statusCountEl = document.getElementById('yardActiveStatusMatchCount');
+            if (statusBannerEl && statusBadgeEl) {
+                if (selectedStatus) {
+                    statusBadgeEl.textContent = selectedStatus;
+                    if (statusCountEl) {
+                        statusCountEl.textContent = `(${containers.length} ${containers.length === 1 ? 'container' : 'containers'})`;
+                    }
+                    statusBannerEl.classList.remove('hidden');
+                } else {
+                    statusBannerEl.classList.add('hidden');
+                    statusBadgeEl.textContent = '';
+                    if (statusCountEl) statusCountEl.textContent = '';
+                }
+            }
+
+			const equipBannerEl = document.getElementById('yardActiveEquipmentFilterBanner');
+            const equipBadgeEl = document.getElementById('yardActiveEquipmentFilterBadge');
+            const equipCountEl = document.getElementById('yardActiveEquipmentMatchCount');
+            if (equipBannerEl && equipBadgeEl) {
+                if (selectedEq) {
+                    const rawEquipLabel = (eqFilterEl && eqFilterEl.options[eqFilterEl.selectedIndex])
+                        ? eqFilterEl.options[eqFilterEl.selectedIndex].text.trim()
+                        : selectedEq;
+                    equipBadgeEl.textContent = rawEquipLabel;
+                    if (equipCountEl) {
+                        equipCountEl.textContent = `(${containers.length} ${containers.length === 1 ? 'container' : 'containers'})`;
+                    }
+                    equipBannerEl.classList.remove('hidden');
+                } else {
+                    equipBannerEl.classList.add('hidden');
+                    equipBadgeEl.textContent = '';
+                    if (equipCountEl) equipCountEl.textContent = '';
+                }
+            }
+
+            const searchBannerEl = document.getElementById('yardActiveSearchFilterBanner');
+            const searchBadgeEl = document.getElementById('yardActiveSearchFilterBadge');
+            const searchCountEl = document.getElementById('yardActiveSearchMatchCount');
+            const rawSearchText = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').trim();
+            if (searchBannerEl && searchBadgeEl) {
+                if (rawSearchText) {
+                    searchBadgeEl.textContent = rawSearchText;
+                    if (searchCountEl) {
+                        searchCountEl.textContent = `(${containers.length} ${containers.length === 1 ? 'container' : 'containers'})`;
+                    }
+                    searchBannerEl.classList.remove('hidden');
+                } else {
+                    searchBannerEl.classList.add('hidden');
+                    searchBadgeEl.textContent = '';
+                    if (searchCountEl) searchCountEl.textContent = '';
+                }
+            }
+
+			const filteredCountBadgeEl = document.getElementById('yardInventoryFilteredCountBadge');
+            const activeFilterCount = [Boolean(rawSearchText), Boolean(selectedStatus), Boolean(selectedEq)].filter(Boolean).length;
+            const hasAnyFilter = activeFilterCount > 0;
+            const showClearAll = activeFilterCount >= 2;
+
+            document.querySelectorAll('button[data-clear-all-filters="true"]').forEach(btn => {
+                if (showClearAll) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            });
+
+            if (filteredCountBadgeEl) {
+                if (hasAnyFilter) {
+                    filteredCountBadgeEl.textContent = `${containers.length} ${containers.length === 1 ? 'Match' : 'Matches'}`;
+                    filteredCountBadgeEl.classList.remove('hidden');
+                } else {
+                    filteredCountBadgeEl.textContent = '';
+                    filteredCountBadgeEl.classList.add('hidden');
+                }
+            }
 
             tbody.innerHTML = containers.length ? containers.map(c => {
 				let badgeClass = 'Available';
@@ -10527,17 +10858,44 @@ Skymover Transport is not liable for charges incurred due to operational constra
                 }
 
 				const equipLabel = c.equipment || c.gateOutEquipment || '—';
+				const locationLabel = `Block ${c.block || 'A'}, Bay ${c.bay || '1'} (${c.row || 'GROUND'})`;
+				const matchedMetaParts = [];
+				if (rawSearchText) {
+				    if (String(c.plate || '').toLowerCase().includes(search) && c.plate) {
+				        matchedMetaParts.push(`Plate: ${highlightInventorySearchTerm(c.plate, rawSearchText)}`);
+				    }
+				    if (String(c.truckingName || '').toLowerCase().includes(search) && c.truckingName) {
+				        matchedMetaParts.push(`Trucking: ${highlightInventorySearchTerm(c.truckingName, rawSearchText)}`);
+				    }
+				    if (String(c.driver || '').toLowerCase().includes(search) && c.driver) {
+				        matchedMetaParts.push(`Driver: ${highlightInventorySearchTerm(c.driver, rawSearchText)}`);
+				    }
+					if (String(c.eir || '').toLowerCase().includes(search) && c.eir) {
+				        matchedMetaParts.push(`EIR: ${highlightInventorySearchTerm(c.eir, rawSearchText)}`);
+				    }
+				    if (String(c.condition || '').toLowerCase().includes(search) && c.condition) {
+				        matchedMetaParts.push(`Condition: ${highlightInventorySearchTerm(c.condition, rawSearchText)}`);
+				    }
+				    if (String(c.remarks || '').toLowerCase().includes(search) && c.remarks) {
+				        matchedMetaParts.push(`Remarks: ${highlightInventorySearchTerm(c.remarks, rawSearchText)}`);
+				    }
+				}
+				const matchedMetaHtml = matchedMetaParts.length
+				    ? `<div class="mt-1 text-[10px] font-mono text-slate-600">${matchedMetaParts.join(' • ')}</div>`
+				    : '';
+				const conditionLabel = c.condition || 'Good';
+				const conditionHtml = `<div class="mt-1 text-[10px] font-semibold text-slate-600">Cond: ${rawSearchText ? highlightInventorySearchTerm(conditionLabel, rawSearchText) : escapeHtml(conditionLabel)}</div>`;
 				return `
                     <tr class="border-b hover:bg-slate-50">
-                        <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(c.number)}</td>
-                        <td class="p-3">${escapeHtml(c.size)} / ${escapeHtml(c.type || 'Dry')}</td>
-                        <td class="p-3 font-bold">${escapeHtml(c.line)}</td>
-                        <td class="p-3 font-semibold text-slate-800">${escapeHtml(equipLabel)}</td>
-                        <td class="p-3"><span class="pill ${escapeHtml(badgeClass)}">${escapeHtml(c.status)}</span></td>
-                        <td class="p-3 font-mono text-xs">Block ${escapeHtml(c.block || 'A')}, Bay ${escapeHtml(c.bay || '1')} (${escapeHtml(c.row || 'GROUND')})</td>
-                        <td class="p-3 font-mono text-[11px]">${c.date ? escapeHtml(new Date(c.date).toLocaleString()) : '—'}</td>
-                        <td class="p-3 font-mono text-[11px]">${c.gateOutDate ? escapeHtml(new Date(c.gateOutDate).toLocaleString()) : 'Active'}</td>
-                        <td class="p-3 font-mono text-[11px]">In: ₱${Number(c.vanInAmount || 0)} (${escapeHtml(c.vanInStats || 'PAID')})<br>Out: ₱${Number(c.vanOutAmount || 0)}</td>
+                        <td class="p-3 font-mono font-bold text-slate-900">${highlightInventorySearchTerm(c.number, rawSearchText)}${matchedMetaHtml}</td>
+                        <td class="p-3">${highlightInventorySearchTerm(c.size, rawSearchText)} / ${highlightInventorySearchTerm(c.type || 'Dry', rawSearchText)}</td>
+                        <td class="p-3 font-bold">${highlightInventorySearchTerm(c.line, rawSearchText)}</td>
+                        <td class="p-3 font-semibold text-slate-800">${rawSearchText ? highlightInventorySearchTerm(equipLabel, rawSearchText) : escapeHtml(equipLabel)}</td>
+                        <td class="p-3"><span class="pill ${escapeHtml(badgeClass)}">${highlightInventorySearchTerm(c.status, rawSearchText)}</span>${conditionHtml}</td>
+                        <td class="p-3 font-mono text-xs">${highlightInventorySearchTerm(locationLabel, rawSearchText)}</td>
+						<td class="p-3 font-mono text-[11px]">${c.date ? highlightInventorySearchTerm(new Date(c.date).toLocaleString(), rawSearchText) : '—'}</td>
+                        <td class="p-3 font-mono text-[11px]">${c.gateOutDate ? highlightInventorySearchTerm(new Date(c.gateOutDate).toLocaleString(), rawSearchText) : 'Active'}</td>
+                        <td class="p-3 font-mono text-[11px]">In: ₱${Number(c.vanInAmount || 0)} (${highlightInventorySearchTerm(c.vanInStats || 'PAID', rawSearchText)})<br>Out: ₱${Number(c.vanOutAmount || 0)}</td>
                         <td class="p-3 text-right space-x-1">${actionsHtml}</td>
                     </tr>
                 `;
@@ -10595,16 +10953,40 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             // CLIENT SELF-SERVICE PORTAL: DIRECT SAVE TO SUPABASE FOR IMMEDIATE YARD PERSONNEL REVIEW
 			if (isClientQrMode) {
-			        const waiverAccepted = document.getElementById('gateInWaiverAccepted')?.checked || false;
-			        const waiverSignature = (document.getElementById('gateInWaiverSignature')?.value || '').trim();
-			        const signedAtIso = new Date().toISOString();
-			
-			        if (!waiverAccepted || !waiverSignature) {
-			            showSkymoverNotice('You must check the Mandatory Waiver agreement and enter your Electronic Signature (Full Name) before submitting.', 'warning');
-			            return;
-			        }
-			
-			        if (submitBtn) {
+		            const waiverAccepted = document.getElementById('gateInWaiverAccepted')?.checked || false;
+		            const waiverSignature = (document.getElementById('gateInWaiverSignature')?.value || '').trim();
+		            const signedAtIso = new Date().toISOString();
+		
+		            if (!waiverAccepted || !waiverSignature) {
+		                showSkymoverNotice('You must check the Mandatory Waiver agreement and enter your Electronic Signature (Full Name) before submitting.', 'warning');
+		                return;
+		            }
+		
+		            const hasLocalDuplicate = Array.isArray(yardDb?.containers) && yardDb.containers.some(c => {
+		                const sameNo = String(c.number || '').trim().toUpperCase() === containerNo;
+		                if (!sameNo) return false;
+		                const st = String(c.status || '').trim();
+		                return st === 'Pending' || st !== 'Released';
+		            });
+		
+		            if (hasLocalDuplicate) {
+		                showSkymoverNotice(`Duplicate submission blocked: Container ${escapeHtml(containerNo)} already has an active or pending record.`, 'warning');
+		                return;
+		            }
+		
+		            if (supabaseClient) {
+		                try {
+		                    const { data: existingRows, error: lookupErr } = await supabaseClient.rpc('client_qr_lookup_container', {
+		                        p_container_number: containerNo
+		                    });
+		                    if (!lookupErr && Array.isArray(existingRows) && existingRows.some(r => String(r.status || '').trim() !== 'Released')) {
+		                        showSkymoverNotice(`Duplicate submission blocked: Container ${escapeHtml(containerNo)} is already in the yard or pending review.`, 'warning');
+		                        return;
+		                    }
+		                } catch (_) {}
+		            }
+		
+		            if (submitBtn) {
 			            submitBtn.disabled = true;
 			            submitBtn.textContent = 'Submitting Request...';
 			        }
@@ -10961,22 +11343,51 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
             // CLIENT SELF-SERVICE PORTAL: DIRECT SAVE TO SUPABASE FOR YARD PERSONNEL REVIEW
 			if (isClientQrMode) {
-			        const containerNo = (document.getElementById('yardOutContainerInput')?.value || '').trim().toUpperCase();
-			        const customer = (document.getElementById('gateOutCustomer')?.value || '').trim();
-			        const plate = (document.getElementById('gateOutPlate')?.value || '').trim().toUpperCase();
-			        const driver = (document.getElementById('gateOutDriver')?.value || '').trim();
-					const equipment = (document.getElementById('gateOutEquipment')?.value || '').trim();
-			        const eirRef = (document.getElementById('gateOutEir')?.value || '').trim();
-			        const etaPulloutDate = document.getElementById('gateOutETADateInput')?.value || '';
-			        const gateOutToD = document.getElementById('gateOutToD')?.value || 'MORNING';
-			        const remarks = (document.getElementById('gateOutRemarks')?.value || '').trim();
-			
-			        if (!containerNo || !customer || !plate || !equipment || !eirRef || !etaPulloutDate) {
-			            showSkymoverNotice('Please complete all required Gate-Out fields marked with *.', 'warning');
-			            return;
-			        }
-			
-			        if (submitBtn) {
+		            const containerNo = (document.getElementById('yardOutContainerInput')?.value || '').trim().toUpperCase();
+		            const customer = (document.getElementById('gateOutCustomer')?.value || '').trim();
+		            const plate = (document.getElementById('gateOutPlate')?.value || '').trim().toUpperCase();
+		            const driver = (document.getElementById('gateOutDriver')?.value || '').trim();
+		            const equipment = (document.getElementById('gateOutEquipment')?.value || '').trim();
+		            const eirRef = (document.getElementById('gateOutEir')?.value || '').trim();
+		            const etaPulloutDate = document.getElementById('gateOutETADateInput')?.value || '';
+		            const gateOutToD = document.getElementById('gateOutToD')?.value || 'MORNING';
+		            const remarks = (document.getElementById('gateOutRemarks')?.value || '').trim();
+		
+		            if (!containerNo || !customer || !plate || !equipment || !eirRef || !etaPulloutDate) {
+		                showSkymoverNotice('Please complete all required Gate-Out fields marked with *.', 'warning');
+		                return;
+		            }
+		
+		            const hasLocalPendingGateOut =
+		                (Array.isArray(yardDb?.containers) && yardDb.containers.some(c =>
+		                    String(c.number || '').trim().toUpperCase() === containerNo &&
+		                    String(c.status || '').trim() === 'Pending Gate-Out'
+		                )) ||
+		                (Array.isArray(pendingClientGateNotifications) && pendingClientGateNotifications.some(n => {
+		                    const sameNo = String(n.container_number || '').trim().toUpperCase() === containerNo;
+		                    const isOut = String(n.movement_type || '').trim().toUpperCase() === 'GATE_OUT';
+		                    const rev = String(n.review_status || n.status || 'PENDING').trim().toUpperCase();
+		                    return sameNo && isOut && rev !== 'ACCEPTED' && rev !== 'REJECTED';
+		                }));
+		
+		            if (hasLocalPendingGateOut) {
+		                showSkymoverNotice(`Duplicate Gate-Out blocked: Container ${escapeHtml(containerNo)} already has a pending Gate-Out request.`, 'warning');
+		                return;
+		            }
+		
+		            if (supabaseClient) {
+		                try {
+		                    const { data: existingRows, error: lookupErr } = await supabaseClient.rpc('client_qr_lookup_container', {
+		                        p_container_number: containerNo
+		                    });
+		                    if (!lookupErr && Array.isArray(existingRows) && existingRows.some(r => String(r.status || '').trim() === 'Pending Gate-Out')) {
+		                        showSkymoverNotice(`Duplicate Gate-Out blocked: Container ${escapeHtml(containerNo)} is already Pending Gate-Out.`, 'warning');
+		                        return;
+		                    }
+		                } catch (_) {}
+		            }
+		
+		            if (submitBtn) {
 			            submitBtn.disabled = true;
 			            submitBtn.textContent = 'Submitting Request...';
 			        }
@@ -11856,9 +12267,29 @@ Skymover Transport is not liable for charges incurred due to operational constra
 
 		function resetYardInventoryFilters() {
             const searchEl = document.getElementById('yardSearchInput');
+            const statusFilterEl = document.getElementById('yardInventoryStatusFilter');
             const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
             if (searchEl) searchEl.value = '';
+            if (statusFilterEl) statusFilterEl.value = '';
             if (eqFilterEl) eqFilterEl.value = '';
+            renderYardInventory();
+        }
+
+		function clearYardInventoryStatusFilter() {
+            const statusFilterEl = document.getElementById('yardInventoryStatusFilter');
+            if (statusFilterEl) statusFilterEl.value = '';
+            renderYardInventory();
+        }
+
+		function clearYardInventoryEquipmentFilter() {
+            const eqFilterEl = document.getElementById('yardInventoryEquipmentFilter');
+            if (eqFilterEl) eqFilterEl.value = '';
+            renderYardInventory();
+        }
+
+		function clearYardInventorySearchFilter() {
+            const searchEl = document.getElementById('yardSearchInput');
+            if (searchEl) searchEl.value = '';
             renderYardInventory();
         }
 		
